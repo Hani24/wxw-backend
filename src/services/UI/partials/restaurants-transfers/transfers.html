@@ -1,0 +1,77 @@
+  
+<div>
+
+  <div class="section-title"> #Restaurants: </div>
+  <div class="share-row">
+    <table>
+      <thead>
+        <tr> 
+          <th>#ID</th>
+          <th>Resto</th>
+          <th>Status</th>
+          <th>Amount</th>
+          <th>Transfered?</th>
+          <th>Tansfer-ID</th>
+          <th>Transfer error?</th>
+          <th>Paid-Out?</th>
+          <th>Payout-ID</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody id="transfers">
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<style type="text/css">
+table{ width: 100%; }
+.share-row{ width: 100%; box-sizing: border-box; padding: 20px 10px; }
+.line{ width: 100%; background: #000; height: 1px; margin: 10px 0; }
+</style>
+
+<script type="text/javascript">
+
+  const data = {data};
+  const OWNER_ACC = 'acct_1LNZzYRGD3D1h01B'; // App.getEnv('....');
+
+  window.addEventListener('load',()=>{
+
+    const elTransfers = document.getElementById('transfers');
+    // id
+    // status
+    // amount
+    // isTransfered
+    // // transferedAt
+    // transferId
+    // transferError
+    // isPaidOut
+    // // paidOutAt
+    // paidOutError
+    // payoutId
+    // // isInited
+    // // initedAt
+    // // createdAt
+
+    for( const transfer of data.transfers ){
+      elTransfers.innerHTML += `
+        <tr> 
+          <td>${transfer.id}</td>
+          <td><a target="_blank" href="${transfer.Restaurant.shareableLink}">${transfer.Restaurant.name}</a></td>
+          <td>${transfer.status}</td>
+          <td>${(+transfer.amount).toFixed(2)}</td>
+          <td>${transfer.isTransfered ? '<span style="color:green;">Yes</span>':'<span style="color:red;">No</span>'}</td>
+          <td>${(!!transfer.transferId) ? `<a target="_blank" href="https://dashboard.stripe.com/test/connect/transfers/${transfer.transferId}">${transfer.transferId}</ap>` : 'n/a'}</td>
+          <td>${(!transfer.transferError) ? '<span style="color:green;">No</span>':`<span style="color:red;">${transfer.transferError}</span>`}</td>
+          <td>${transfer.isPaidOut ? '<span style="color:green;">Yes</span>':'<span style="color:red;">No</span>'}</td>
+          <td>${(!!transfer.payoutId) ? `<a target="_blank" href="https://dashboard.stripe.com/${OWNER_ACC}/test/payouts/${transfer.payoutId}">${transfer.payoutId}</ap>` : 'n/a'}</td>
+          <td>${ (new Date(transfer.createdAt)).toLocaleString() }</td>
+        </tr>
+      `;
+    }
+
+  });
+
+</script>
+

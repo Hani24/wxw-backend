@@ -1,0 +1,108 @@
+const express = require('express');
+const router = express.Router();
+
+// {
+//   "id": "required: <number>: Ref. Client.id"
+// }
+
+// /private/admin/Clients/delete/by/id/
+
+module.exports = function(App, RPath){
+
+  router.use('', async(req, res)=>{
+
+    try{
+
+      const data = req.getPost();
+      // const mUser = await req.user; // restaurant-owner
+      // const mRestaurant = await req.restaurant;
+      const roles = App.getModel('User').getRoles();
+
+      const id = req.getCommonDataInt('id', null);
+
+      if( App.isNull(id) )
+        return App.json( res, 417, App.t(['user','id','is-required'], req.lang) );
+
+      const mClient = await App.getModel('Client').findOne({
+        where: {
+          id: id,
+          isDeleted: false,          
+          isRestricted: false, 
+        },
+        attributes: [
+          'id','userId','isDeleted','deletedAt','isRestricted','restrictedAt',
+        ],
+        include: [{
+          required: true,
+          model: App.getModel('User'),
+          where: {
+            isDeleted: false,
+            isRestricted: false,
+            // role: roles.client,
+          },
+          attributes: [
+            'id','email','phone','isDeleted','deletedAt','isRestricted','restrictedAt',
+          ]
+        }]
+      });
+
+      if( !App.isObject(mClient) || !App.isPosNumber(mClient.id) )
+        return App.json( res, 404, App.t(['client','not-found'], req.lang) );
+
+      const tx = await App.DB.sequelize.transaction( App.DB.getTxOptions() );
+
+      try{
+
+        const updateClient = await mClient.update({
+          isDeleted: true,
+          deletedAt: App.getISODate(),
+          isRestricted: true,
+          restrictedAt: App.getISODate(),
+        }, {transaction: tx});
+
+        if( !App.isObject(updateClient) || !App.isPosNumber(updateClient.id) ){
+          await tx.rollback();
+          return App.json(res, false, App.t(['failed-to','update','client'], req.lang));
+        }
+
+        const updateUser = await mClient.User.update({
+          isDeleted: true,
+          deletedAt: App.getISODate(),
+          isRestricted: true,
+          restrictedAt: App.getISODate(),
+  	  email: `deleted ${mClient.User.id} ${mClient.User.email}`,
+          phone: `deleted ${mClient.User.id} ${mClient.User.phone}`,
+        }, {transaction: tx});
+
+        if( !App.isObject(updateUser) || !App.isPosNumber(updateUser.id) ){
+          await tx.rollback();
+          return App.json( res, false, App.t(['failed-to','update','user'], req.lang) );
+        }
+
+        await tx.commit();
+
+        await App.getModel('Session').destroy({
+          where: { userId: mClient.userId }
+        });
+
+      }catch(e){
+        console.error(e.message);
+        await tx.rollback();
+        return App.json( res, false, App.t(['failed-to','delete','client'], req.lang) );
+      }
+
+      await App.json( res, true, App.t(['client','successfully','restricted'], res.lang));
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: '', autoDoc:{} };
+
+};
+
+

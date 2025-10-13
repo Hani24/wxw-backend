@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>auth-test</title>
+    <link rel="stylesheet" type="text/css" href="/socket/dev/css/main.css" />
+
+    <script type="text/javascript" src="/socket/dev/io/socket.io.min.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/axios.min.v1.25.0.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/MEDB.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/EventEmitter.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/Socket.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/Axi.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/Bell.js"></script>
+
+    <script type="text/javascript" src="/socket/dev/js/alertifyjs/alertify.min.js"></script>
+    <script type="text/javascript" src="/socket/dev/js/alertifyjs/alertify.init.js"></script>
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/alertify.min.css" />
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/themes/bootstrap.min.css" />
+
+    <!-- 
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/alertify.override.css" />
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/themes/semantic.min.css" />
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/themes/semantic.min.css" />
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/alertify.min.css" />
+    <link rel="stylesheet" type="text/css" href="/socket/dev/js/alertifyjs/css/alertify.override.css" />
+    -->
+
+    <script type="text/javascript">
+
+      window.addEventListener('load',async()=>{
+
+        window.alertify.setDefaults('Dev', 'Ok', 'Cancel', 6, 'top-right');
+
+        const mBell = new Bell({
+          soundName: '/socket/dev/audio/order/reception-bell.single.mp3',
+          // soundName: '/socket/dev/audio/order/reception-bell.double.mp3',
+          // soundName: '/socket/dev/audio/order/reception-bell.ringing.high-pitch.mp3',
+          // soundName: '/socket/dev/audio/order/reception-bell.ringing.low-pitch.mp3',
+        });
+
+        // document.body.addEventListener('click',()=>{
+        //   mBell.play();
+        // });
+
+        // return;
+        MEDB.set('token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjgsInJlc3RhdXJhbnRJZCI6Miwic2Vzc2lvbklkIjo0LCJ0b2tlbiI6IjA0MmRjN2NmMDdiYTUwNTAzNmIwMDE4N2JmMzAyNjkyNTA5MDBmYjQ4YTQxZWMwNzdmMGRkOTgzZmUyOGZhODUiLCJyb2xlIjoicmVzdGF1cmFudCIsImNvdW50cnkiOiJuL2EiLCJ0aW1lem9uZSI6Im4vYSIsImlwIjoiMTkyLjE2OC4wLjEiLCJkYXRlIjoiMjAyMi0wMS0yM1QwNjoxMzoyMSIsImlhdCI6MTY0MjkxNDgwMX0.ezmtAHR0l2LycUCRCkxHvXYMKItzLdvXf1vgwW1P77Q' );
+  
+        const mAxi = new Axi({
+          base: `${window.location.protocol}//${window.location.hostname.replace('.restaurant','.api')}`,
+        });
+
+        const mSocket = new Socket({
+          env: 'dev',
+          token: MEDB.get('token'),
+        });
+
+        mSocket.on('authenticate', async(data)=>{
+          console.log(`#on:authenticate`, data);
+          if( !data.success ){
+            mSocket.setAuthCreds({token: MEDB.get('token')});
+            mSocket.authenticate();
+          }
+        });
+
+        mSocket.on('info', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('adminMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('courierMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('supplierMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('clientMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('clientConfirmedOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('clientPaidOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('orderHasBeenPaid', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('clientCanceledOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('clientRejectedOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('courierAssignedToOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('courierCanceledOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('courierArrived', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('courierGotOrder', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('orderCompleted', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('orderRated', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('adminP2pMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+        mSocket.on('adminBroadcastMessage', async(event)=>{ console.log(`#on:${event.event}`, event); });
+
+        mSocket.on('newUnpaidOrder', async(event)=>{
+          console.log(`#on:${event.event}`, event);
+          mBell.play();
+
+          const rejectRes = await mAxi.post('/private/restaurant/order-requests/cancel/by/id/', {
+            id: event.data.orderId
+          });
+
+          console.log(rejectRes);
+
+        });
+
+      });
+
+    </script>
+
+  </head>
+  <body>
+
+  </body>
+</html>

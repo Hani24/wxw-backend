@@ -1,0 +1,15 @@
+require('./src/envs/init.env.js');
+require('babel-register');
+const path = require('path');
+
+const SRC = __dirname+'/src';
+const NODE_ENV = process.env.NODE_ENV;
+
+module.exports = {
+  'env': NODE_ENV,
+  'debug' : true,
+  'config': SRC+'/envs/'+NODE_ENV+'/sequelize.config.js',
+  'models-path': SRC+'/DB/models',
+  'seeders-path': SRC+'/DB/seeders',
+  'migrations-path': SRC+'/DB/migrations'
+};

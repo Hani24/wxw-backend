@@ -1,0 +1,16 @@
+<div style="
+  margin: 0 auto; display: block; width: 100%; max-width: 768px; box-sizing: border-box; padding: 5px;
+  background: #f2f2f2;
+  /* box-shadow: 0 0 4px #333;  */
+  border: solid 1px #ccc;
+">
+
+  <div style="background: #ffffff;">
+    {header}
+    {body}
+    {footer}
+    {social}
+    {copyright}
+  </div>
+
+</div>

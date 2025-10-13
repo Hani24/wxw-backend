@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>client</title>
+
+    <script type="text/javascript" src="/socket/dev/io/socket.io.min.js"></script>
+    <script type="text/javascript" src="/socket/rem/io/socket.io.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="./css/main.css"/>
+
+    <script type="text/javascript">
+
+      const HOST = location.host;      
+      const ENV = HOST.match(/3dmadcat/gi) ? 'dev' : 'rem';
+
+      const users = {
+        admin: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjcsInNlc3Npb25JZCI6MzIsInRva2VuIjoiMTBiNWIzYTA2ZWEyMGI4YWZmMjdjYTI0YWY0MDZjMGNiYzg0OTFiMGRlODE3M2E5MTZhOThkZmQxZTYxOGVjMSIsInJvbGUiOiJhZG1pbiIsImNvdW50cnkiOiJCRSIsInRpbWV6b25lIjoiRXVyb3BlL0JydXNzZWxzIiwiaXAiOiIxNDEuMTM1LjIwMC4xMDIiLCJkYXRlIjoiMjAyMi0wNC0yMlQyMTo1MTozNSIsImlhdCI6MTY1MDY1NzA5NX0.xZwT-Q2GFPq30c194zbQgafDH2b4M-_XiUrqObpRVQY',
+        // kfc
+        restaurant: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjgsInJlc3RhdXJhbnRJZCI6Miwic2Vzc2lvbklkIjozMSwidG9rZW4iOiJhMTJmNzhkY2UxN2Q4NTc3MzZhMDczYjUwMmIxMTk1ZjlkZDg2MDQ4ODA4OTA1ZmQ4MGFhYjU0NTBkMTQ2ZjFkIiwicm9sZSI6InJlc3RhdXJhbnQiLCJjb3VudHJ5IjoiQkUiLCJ0aW1lem9uZSI6IkV1cm9wZS9CcnVzc2VscyIsImlwIjoiMTQxLjEzNS4yMDAuMTAyIiwiZGF0ZSI6IjIwMjItMDctMTVUMTc6MDE6MDUiLCJpYXQiOjE2NTc4OTcyNjV9.8DbuGPSHShA_ItnXwFa93WLp0U0Jk8oeYAhFAz2WgeE',
+
+        courier: {
+          phone: '+32499333333',
+          userId: 52,
+          courierId: 8,
+          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUyLCJzZXNzaW9uSWQiOjYwLCJ0b2tlbiI6IjYzZjhmMGM1NzQ0ODEzYWFlNGUzMDBhNGUzNDRiMTdhYTBhMGYxYWRiYjExYWY3ODg0MThmNGY5ZTI5ZjA1ZmMiLCJyb2xlIjoiY291cmllciIsImlhdCI6MTY1ODQ4Njg1NH0.ez24uHlNwVIP6JKrDP4_Hk5QaDewnGORYUHBiKntDXk',
+        },
+        client: {
+          phone: '+32499111111',
+          userId: 51,
+          clientId: 0,
+          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUxLCJzZXNzaW9uSWQiOjY0LCJ0b2tlbiI6IjQ5M2FiN2YyM2QzMjgwMjIwMWEyNTFiZGQwNmUwN2M3MmYzYzlmMzMxMzUzNWRmM2Y5ZmZmNGFiMjJjYjZlZTYiLCJyb2xlIjoiY2xpZW50IiwiaWF0IjoxNjU4NDg3NTM2fQ.Kvhh4PSZIHJ3nRlOQSBglIg1S4vKgKiGmh1poVlOTWI',
+        },
+        // client: {
+        //   phone: '+32498403994',
+        //   userId: 6,
+        //   clientId: 2,
+        //   token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjYsInNlc3Npb25JZCI6NTEsInRva2VuIjoiZjU0NGUyNzBjMDg2NTBjZDBjZDNlMTVmNWQ1NDIzMDRhY2NmMGEzNDZjNjlmZDcyMzhhNjU0MTI3YTUzYTZkYiIsInJvbGUiOiJjbGllbnQiLCJpYXQiOjE2NTc4MDgzNjB9.tox9Mw5w7Hkk7DQBr2KXAhAhdC-CajhTdjWxNLWjZWE',
+        // },
+      };
+
+      // const token = users.courier.token;
+
+      const mkSockConnection = async(token)=>{
+
+        const wrapper = document.getElementById('wrapper');
+        const push = (message, scroll=false)=>{
+          wrapper.innerHTML += message;
+          if( scroll )
+            wrapper.scrollTo( 0, wrapper.scrollHeight );
+        }
+
+        push(` <div class="message info"> connecting ...</div>`);
+  
+        const sock = io.connect(`wss://${HOST}`, {
+          path: `/socket/${ENV}/io/`,
+          extraHeaders: { env: ENV }, // optionsl
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+
+          autoConnect: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          randomizationFactor: 0.5,
+          timeout: 20000, // for each connection attempt
+          // auth: { token: "abcd" },
+        });
+
+
+        sock.on('connect',(err,info)=>{
+          push(` <div class="message ok"> ${'connected...'}</div>`);
+          sock.emit('authenticate-client', {token});
+        });
+
+        sock.on('connect_error',(err,info)=>{
+          push(`<div class="message error">connection: ${err.message}</div>`);
+        });
+
+        sock.on('reconnect',(err,info)=>{ console.log(`reconnect: `, {err, info}); });
+        sock.on('reconnect_attempt',(err,info)=>{ console.log(`reconnect_attempt: `, {err, info}); });
+        sock.on('reconnecting',(err,info)=>{ console.log(`reconnecting: `, {err, info}); });
+        sock.on('reconnect_error',(err,info)=>{ console.log(`reconnect_error: `, {err, info}); });
+        sock.on('reconnect_failed',(err,info)=>{ console.log(`reconnect_failed: `, {err, info}); });
+
+        sock.on('authenticate-client',(event)=>{
+          console.log(event);
+          push(` <div class="message ${event.success?'ok':'error'}">${event.message}</div>`);
+          push(` <div class="message">${JSON.stringify(event.data)}</div>`);
+
+          if( event.data.role === 'courier' ){
+            setInterval(()=>{
+              sock.emit('live-position-of-courier-updated', {
+                lat: +(50.85400000 + (Math.random()/50)).toFixed(8),
+                lon: +(3.5488121 + (Math.random()/50)).toFixed(8),
+              })
+            },2500);
+          }
+        });
+
+        sock.on('live-position-of-courier-updated',(event)=>{
+          push(`<div class="message">${JSON.stringify(event)}</div>`, true);
+        });
+
+      }
+
+      window.addEventListener('load',()=>{
+
+        document.getElementById('connect-btn-client').addEventListener('click',()=>{
+          mkSockConnection(users.client.token)
+        });
+
+        document.getElementById('connect-btn-courier').addEventListener('click',()=>{
+          mkSockConnection(users.courier.token)
+        });
+
+      });
+
+    </script>
+
+  </head>
+  <body>
+    <div style="box-sizing: border-box; padding: 10px; text-align: center;">
+      <button id="connect-btn-client">Connect Client</button>
+      <button id="connect-btn-courier">Connect Courier</button>
+    </div>
+    <div id="wrapper">
+      <!--
+      <div class="message">loremLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam</div>
+      -->
+    </div>
+  </body>
+</html>

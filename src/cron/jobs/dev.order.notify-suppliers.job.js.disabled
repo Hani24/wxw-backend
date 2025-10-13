@@ -1,0 +1,110 @@
+module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
+
+  const Job = new BaseJob( App, {
+    name: jobName,
+    allowMultipleTasksAtTheSameTime: false, // do not wait for prev. instance to end.
+    isEnabled: false, // App.isEnv('rem'),
+    runOnce: false,
+    runAtStart: false, // true,
+    debug: false,
+    // debug: App.isEnv('dev'),
+    runAt: [
+      { each: 10, type: 'seconds' },
+      // { each: 5, type: 'minutes' },
+      // { each: 1, type: 'hours' },
+      // { each: 10, type: 'minutes' },
+      // { at: 10, type: 'hours' },
+    ],
+  });
+
+  Job.on('task', async(job, {each=0,type='n/a'})=>{
+
+    // old-dev: for auto [resto-accept] dev only
+
+    // // https://interexy-com.atlassian.net/wiki/spaces/MAI/pages/221839491/R03.03+Accept+or+decline+new+order
+
+    // const statuses = App.getModel('Order').getStatuses();
+    // const paymentTypes = App.getModel('OrderPaymentType').getTypes();
+
+    // const ageOfOrderDate = App.getModel('Order').getDefaultMaxAgeOfOrder();
+
+    // const mOrders = await App.getModel('Order').findAll({
+    //   where: {
+    //     status: statuses['processing'],
+    //     courierId: null,
+    //     allSuppliersHaveConfirmed: false,
+    //     isRejectedByClient: false,
+    //     isCanceledByClient: false,
+    //     isLocked: false,
+    //     createdAt: { [ App.DB.Op.gt ]: ageOfOrderDate },
+    //   },
+    //   attributes: [
+    //     'id','clientId', // 'courierId',
+    //     'isRejectedByClient','isCanceledByClient',
+    //     // 'allSuppliersHaveConfirmed', 'allSuppliersHaveConfirmedAt',
+    //     'createdAt'
+    //   ],
+    //   include: [{
+    //     model: App.getModel('OrderSupplier'),
+    //     required: true,
+    //     where: {
+    //       isRestaurantNotified: false,
+    //       // isRestaurantAcknowledged: false,
+    //       isAcceptedByRestaurant: false,
+    //       isCanceledByRestaurant: false,
+    //     },
+    //     attributes: [
+    //       'id','restaurantId',
+    //       'isRestaurantNotified', 'isRestaurantAcknowledged',
+    //       'isCanceledByRestaurant', 'isAcceptedByRestaurant',
+    //       'isTakenByCourier','isOrderReady','isOrderDelayed',
+    //       'createdAt'
+    //     ],
+    //   }],
+    //   order: [['id','asc']],
+    //   limit: 10,
+    // });
+
+    // if( !App.isArray(mOrders) || !mOrders.length )
+    //   return true;
+
+    // job.line();
+    // job.log('start');
+
+    // for( const mOrder of mOrders ){
+
+    //   job.line();
+    //   job.warn(` #order: ${mOrder.id}: `);
+
+    //   for( const mOrderSupplier of mOrder.OrderSuppliers ){
+
+    //     // [simulated] notify supplier
+    //     const updateSupplierRes = await mOrderSupplier.update({
+    //       isRestaurantNotified: true,
+    //       restaurantNotifiedAt: App.getISODate(),
+    //       isRestaurantAcknowledged: true,
+    //       restaurantAcknowledgedAt: App.getISODate(),
+    //       isAcceptedByRestaurant: true,
+    //       acceptedByRestaurantAt: App.getISODate(),
+    //     });
+    //     job.debug(` #update: supplier: ${mOrderSupplier.id} => notified: ${updateSupplierRes.isRestaurantNotified} `);
+
+    //   }
+
+    //   // [simulated] data
+    //   const updateOrder = await mOrder.update({
+    //     allSuppliersHaveConfirmed: true,
+    //     allSuppliersHaveConfirmedAt: App.getISODate(),
+    //   });
+    //   job.ok(` #update: order: ${mOrder.id} => allSuppliersHaveConfirmed: ${updateOrder.allSuppliersHaveConfirmed} `);
+
+    // }
+
+    // job.info(`job: ${job.name}: done.`);
+
+  });
+
+  // Job.start();
+  return Job;
+
+}

@@ -1,0 +1,208 @@
+  
+<div>
+
+  <div class="section-title"> #Restaurants: </div>
+  <div class="share-row">
+    <table>
+      <thead>
+        <tr> 
+          <th>#ID</th><th>Name</th><th>Lat</th><th>Lon</th><th>Verified?</th><th>Restricted?</th><th>KYC?</th><th>Action</th><th>View</th>
+        </tr>
+      </thead>
+      <tbody id="restaurants">
+      </tbody>
+    </table>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="section-title"> #Couriers: </div>
+  <div class="share-row">
+    <table>
+      <thead>
+        <tr> 
+          <th>#ID</th><th>Name</th><th>Email</th><th>Lat</th><th>Lon</th><th>Verified?</th><th>Restricted?</th><th>KYC?</th><th>Action</th><th>View</th>
+        </tr>
+      </thead>
+      <tbody id="couriers">
+      </tbody>
+    </table>
+  </div>
+
+  <div class="line"></div>
+
+  <div class="section-title"> #Delivery-Addresses: </div>
+  <div class="share-row">
+    <table>
+      <thead>
+        <tr> 
+          <th>#ID</th><th>Name</th><th>Email</th><th>Default?</th><th>Temp?</th><th>Lable</th><th>Lat</th><th>Lon</th><th>Action</th><th>View</th>
+        </tr>
+      </thead>
+      <tbody id="addresses">
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<style type="text/css">
+table{ width: 100%; }
+.share-row{ width: 100%; box-sizing: border-box; padding: 20px 10px; }
+.line{ width: 100%; background: #000; height: 1px; margin: 10px 0; }
+
+</style>
+
+<script type="text/javascript">
+
+  const toBoolString = (value)=>{
+    return (value)
+      ? '<span style="color:green;">Yes</span>'
+      : '<span style="color:red;">No</span>';
+
+  }
+
+  const data = {data};
+  console.log(data);
+
+  const saveResto = async(id)=>{
+    const lat = (+document.getElementById(`restaurant-lat-${id}`).value);
+    const lon = (+document.getElementById(`restaurant-lon-${id}`).value);
+    overlay(true);
+    const res = await postData('/public/dev/coords/set-resto', {id, lat, lon});
+    overlay(false);
+    if( !res.success )
+      return alert(res.message);
+  };
+
+  const saveCourier = async(id)=>{
+    const lat = (+document.getElementById(`courier-lat-${id}`).value);
+    const lon = (+document.getElementById(`courier-lon-${id}`).value);
+    overlay(true);
+    const res = await postData('/public/dev/coords/set-courier', {id, lat, lon});
+    overlay(false);
+    if( !res.success )
+      return alert(res.message);
+  };
+
+  const saveAddress = async(id)=>{
+    const lat = (+document.getElementById(`address-lat-${id}`).value);
+    const lon = (+document.getElementById(`address-lon-${id}`).value);
+    overlay(true);
+    const res = await postData('/public/dev/coords/set-address', {id, lat, lon});
+    overlay(false);
+    if( !res.success )
+      return alert(res.message);
+  };
+
+  window.addEventListener('load',()=>{
+
+    const elRestaurants = document.getElementById('restaurants');
+    const elCouriers = document.getElementById('couriers');
+    const elAddresses = document.getElementById('addresses');
+
+    for( const restaurant of data.restaurants ){
+      elRestaurants.innerHTML += `
+        <tr> 
+          <td>${restaurant.id}</td>
+          <td><a target="_blank" href="${restaurant.shareableLink}">${restaurant.name}</a></td>
+          <td><input id="restaurant-lat-${restaurant.id}" value="${restaurant.lat}"/></td>
+          <td><input id="restaurant-lon-${restaurant.id}" value="${restaurant.lon}"/></td>
+          <td>${toBoolString(restaurant.isVerified)}</td>
+          <td>${toBoolString(restaurant.isRestricted)}</td>
+          <td>${toBoolString(restaurant.isKycCompleted)}</td>
+          <td><button onClick="saveResto(${restaurant.id})">Save</button></td>
+          <td>
+            <a target="_blank" href="https://www.google.com/maps/@${restaurant.lat},${restaurant.lon},21z">View Map</a>
+          </td>
+        </tr>
+      `;
+    }
+
+    for( const user of data.users ){
+
+      if( user.Courier ){
+        elCouriers.innerHTML += `
+          <tr> 
+            <td>${user.id}</td>
+            <td>${user.firstName} ${user.lastName}</td>
+            <td>${user.email}</td>
+            <td><input id="courier-lat-${user.Courier.id}" value="${user.Courier.lat}"/></td>
+            <td><input id="courier-lon-${user.Courier.id}" value="${user.Courier.lon}"/></td>
+            <td>${toBoolString(user.Courier.isVerified)}</td>
+            <td>${toBoolString(user.Courier.isRestricted)}</td>
+            <td>${toBoolString(user.Courier.isKycCompleted)}</td>
+            <td><button onClick="saveCourier(${user.Courier.id})">Save</button></td>
+            <td>
+              <a target="_blank" href="https://www.google.com/maps/@${user.Courier.lat},${user.Courier.lon},21z">View Map</a>
+            </td>
+          </tr>
+        `;        
+      }
+
+
+      // <th>#ID</th><th>Name</th><th>Email</th><th>Lable</th><th>Lat</th><th>Lon</th><th>Action</th>
+
+
+      if( user.Client ){
+      
+        if( Array.isArray(user.Client.DeliveryAddresses) && user.Client.DeliveryAddresses.length ){
+          for( const address of user.Client.DeliveryAddresses ){
+            elAddresses.innerHTML += `
+              <tr> 
+                <td>${user.id}</td>
+                <td>${user.firstName} ${user.lastName}</td>
+                <td>${user.email}</td>
+                <td>${toBoolString(address.isDefault)}</td>
+                <td>${toBoolString(address.isOneTimeAddress)}</td>
+                <td>${address.label}</td>
+                <td><input id="address-lat-${address.id}" value="${address.lat}"/></td>
+                <td><input id="address-lon-${address.id}" value="${address.lon}"/></td>
+                <td><button onClick="saveAddress(${address.id})">Save</button></td>
+                <td>
+                  <a target="_blank" href="https://www.google.com/maps/@${address.lat},${address.lon},21z">View Map</a>
+                </td>
+              </tr>
+            `;        
+          }
+        }
+      }
+
+
+    }
+
+  });
+
+</script>
+
+
+<!--
+
+[{
+  "id": 9,
+  "firstName": "Bob",
+  "lastName": "Andersen",
+  "email": "courier-3.user-9@mail.com",
+  "phone": "+10000000001",
+  "role": "courier",
+  "Client": {
+    "id": 3,
+    "DeliveryAddresses": [
+      {
+        "id": 6,
+        "label": "Home",
+        "street": "Some Street 453",
+        "lat": 36.4305223,
+        "lon": -119.1063498,
+        "description": ""
+      },
+    ]
+  },
+  "Courier": {
+    "id": 7,
+    "lat": 36.4305223,
+    "lon": -119.1063498
+  }
+},]
+
+-->

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="us-US">
+<head>
+  <meta charset="utf-8"/>
+  <title>{title}</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400&display=swap" rel="stylesheet"/>
+  <!-- 
+    <link href="/ui/css/main.v2.css" rel="stylesheet"/>
+  -->
+  <link href="/ui/css/main.css" rel="stylesheet"/>
+  <style type="text/css">
+    #overlay-element{
+      overflow: hidden;
+      position: fixed; background: rgba(0,0,0,0.7);
+      display: none;
+      box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      padding-top: 150px;
+      text-align: center;
+      color: #fff; text-shadow: 1px 1px 3px #000; 
+      font-size: 32px;
+    }
+  </style>
+
+  <script type="text/javascript">
+    async function postData(path='', data={}) {
+      const response = await fetch(`${location.origin}${path}`, {
+        method: 'POST', 
+        mode: 'cors', 
+        cache: 'no-cache', 
+        credentials: 'same-origin', 
+        headers: {
+          'Content-Type': 'application/json'      
+        },
+        redirect: 'follow', 
+        referrerPolicy: 'no-referrer', 
+        body: JSON.stringify(data) 
+      });
+      return response.json();
+    }
+  </script>
+
+</head>
+<body>
+
+  <div id="overlay-element">Processing...</div>
+  <script type="text/javascript">
+    const _overlayEl = document.getElementById('overlay-element');
+    const overlay = (show)=>{ _overlayEl.style.display = show ? 'block' : 'none'; }
+  </script>
+
+  <div id="wrapper">
+
+    <div id="header-wrapper">
+      <a id="app-name" href="{webSite}" alt="{appName}" title="{appName}" >
+        <div class="header-logo"></div>
+        <span class="header-lable-normal">{appName}</span>
+        <span class="header-lable-colored"></span>
+      </a>
+    </div>
+
+    <div id="message-wrapper">
+      <div id="message-body">
+        {content}
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

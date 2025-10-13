@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>logger</title>
+
+    <!-- 
+      dev:
+        <script type="text/javascript" src="/socket/dev/io/socket.io.min.js"></script>
+      rem:
+        <script type="text/javascript" src="/socket/rem/io/socket.io.min.js"></script>
+    -->
+
+    <script type="text/javascript" src="/socket/rem/io/socket.io.min.js"></script>
+
+    <style type="text/css">
+      html,body{
+        width: 100%; height: 100%; background: #fff;
+        margin: 0; padding: 0; font-family: monospace; font-size: 14px !important;
+      }
+
+      #wrapper{
+        width: 100%; max-width: 94%; max-height: 90%; height: 90%; box-sizing: border-box; margin: 10px auto;
+        padding: 10px; overflow-y: scroll;  background: #333; border: solid 1px;
+      }
+
+      .message{ box-sizing: border-box; margin: 4px 0 0 0; color: #fff; padding-bottom: 1px; }
+
+      .log{ color: #eee !important; }
+      .error{ color: #F22 !important; }
+      .debug{ color: #c2C !important; }
+      .ok{ color: #0e5 !important; }
+      .info{ color: #07F !important; }
+      .warn{ color: #F70 !important; }
+
+      .gray{ color: gray !important; }
+      .red{ color: #F22 !important; }
+      .green{ color: #4d4 !important; }
+      .blue{ color: #07F !important; }
+      .yellow{ color: #ee4 !important; }
+      .purple{ color: #e4e !important; }
+      .blue2{ color: #22f !important; }
+      .white{ color: #fff !important; }
+
+    </style>
+
+    <script type="text/javascript">
+
+      const HOST = location.host;      
+      const ENV = 'rem'; // dev === local dev
+
+      window.addEventListener('load',()=>{
+
+        const wrapper = document.getElementById('wrapper');
+        const push = (message, scroll=false)=>{
+          wrapper.innerHTML += message;
+          if( scroll )
+            wrapper.scrollTo( 0, wrapper.scrollHeight );
+        }
+
+        push(` <div class="message info"> connecting ...</div>`);
+  
+        const sock = io.connect(`wss://${HOST}`, {
+          path: `/socket/${ENV}/io/`,
+          extraHeaders: { env: ENV }, // optionsl
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+
+          autoConnect: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          randomizationFactor: 0.5,
+          timeout: 20000, // for each connection attempt
+          // auth: { token: "abcd" },
+        });
+
+        sock.on('connect',(err,info)=>{
+          push(` <div class="message ok"> ${'connected...'}</div>`);
+        });
+
+        sock.on('connect_error',(err,info)=>{
+          push(`<div class="message error">cannot connect: ${err.message}</div>`);
+        });
+
+        sock.on('reconnect',(err,info)=>{ console.log(`reconnect: `, {err, info}); });
+        sock.on('reconnect_attempt',(err,info)=>{ console.log(`reconnect_attempt: `, {err, info}); });
+        sock.on('reconnecting',(err,info)=>{ console.log(`reconnecting: `, {err, info}); });
+        sock.on('reconnect_error',(err,info)=>{ console.log(`reconnect_error: `, {err, info}); });
+        sock.on('reconnect_failed',(err,info)=>{ console.log(`reconnect_failed: `, {err, info}); });
+
+        sock.on('live-debug-log',(log)=>{
+          if( !log.success ) return console.log(log);
+          // console.log(log.data.string);
+          // log.data.string = log.data.string.replace(/ /g,'&nbsp;');
+          // push(`<div class="message ${log.data.type}">${log.data.string}</div>`, true);
+          push(`<div class="message">${log.data.string}</div>`, true);
+        });
+
+      });
+
+    </script>
+
+  </head>
+  <body>
+    <div id="wrapper">
+      <!--
+      <div class="message">loremLorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam</div>
+      -->
+    </div>
+  </body>
+</html>

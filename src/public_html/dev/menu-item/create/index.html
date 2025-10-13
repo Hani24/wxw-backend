@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="">
+<head>
+  <meta charset="utf-8"/>
+  <title>Menu-Item:Create</title>
+
+  <script type="text/javascript">
+
+    window.addEventListener('load', ()=>{
+
+      document.getElementById('create-btn').addEventListener('click', async()=>{
+
+        const formData = new FormData();
+        const headers = new Headers({
+          // dev
+          // 'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjgsInJlc3RhdXJhbnRJZCI6Miwic2Vzc2lvbklkIjoyNCwidG9rZW4iOiJmMjA1YmU1OWUzNmY0NzAzMmFjYjk3YjFjNzE4ZDQ0ZTMyYjYyMzZkYTRlMjAzYmRiZGY5NTFjNTM3Y2Y3NDQ5Iiwicm9sZSI6InJlc3RhdXJhbnQiLCJjb3VudHJ5Ijoibi9hIiwidGltZXpvbmUiOiJuL2EiLCJpcCI6IjE5Mi4xNjguMC4xIiwiZGF0ZSI6IjIwMjItMDItMTlUMDU6NDk6MDMiLCJpYXQiOjE2NDUyNDYxNDN9.2-_bAy1zkJK3yJKMSWNxDQ45UkiYwSbzVMxs12f1ccc',
+          // rem
+          'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEzLCJyZXN0YXVyYW50SWQiOjIsInNlc3Npb25JZCI6Nzc1LCJ0b2tlbiI6ImU5MGIzYzFlNGU5MzU2YWMzMWNmOWI4YTFhYTc3ZGVjNjNhZTU2M2VjNDIxODFmMDU3OWJhZWZiNDQ2YTc1NWQiLCJyb2xlIjoicmVzdGF1cmFudCIsImNvdW50cnkiOiJCRSIsInRpbWV6b25lIjoiRXVyb3BlL0JydXNzZWxzIiwiaXAiOiIxNDEuMTM1LjIwMC4xMDIiLCJkYXRlIjoiMjAyMi0wMi0yMFQyMzo0NToxMS0wODowMCIsImlhdCI6MTY0NTQyOTUxMX0.C2IJJF9DbjjpqQf5eNX0wv4Up1S1fGOujwHpd056eug',
+
+        });
+
+        const menuItemInput = document.getElementById('menu-item-input');
+
+        formData.append('menuCategoryId', 1); // 11:dev
+        formData.append('name', 'Super Menu-Item');
+        formData.append('description', 'some text');
+        formData.append('kcal', 123);
+        formData.append('proteins', 323);
+        formData.append('fats', 44);
+        formData.append('carbs', 77);
+        formData.append('price', 3.45);
+        formData.append('isAvailable', true);
+        formData.append('image', menuItemInput.files[0]);
+
+        const apiBase = 'https://api.morris-armstrong-ii-dev.ru';
+        // const apiBase = 'https://api.3dmadcat.ru';
+
+        const response = await fetch(`${apiBase}/private/restaurant/menu-items/create/`, {
+          method: 'POST', 
+          headers,
+          body: formData,
+        });
+
+        const createRes = await response.json();
+        console.log(createRes);
+        return createRes;
+
+      });
+
+    });
+
+  </script>
+
+</head>
+<body>
+
+  <div style="padding: 20px; text-align: center;">
+    
+    <input type="file" id="menu-item-input"/>
+    <br/>
+    <br/>
+    <button id="create-btn">Create Menu-Item</button>
+
+  </div>
+
+</body>
+</html>

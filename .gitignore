@@ -1,0 +1,7 @@
+node_modules
+dev_data
+logs/*/*.log
+firebase/*.json
+.env*src/envs/rem/config.js
+src/envs/*/config.js
+.env

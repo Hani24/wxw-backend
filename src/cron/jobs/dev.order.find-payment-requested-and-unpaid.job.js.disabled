@@ -1,0 +1,188 @@
+module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
+
+  const Job = new BaseJob( App, {
+    name: jobName,
+    allowMultipleTasksAtTheSameTime: false, // do not wait for prev. instance to end.
+    isEnabled: false, // App.isEnv('rem'), // true,
+    runOnce: false,
+    runAtStart: false, // true,
+    debug: false,
+    // debug: App.isEnv('dev'),
+    runAt: [
+      // { each: 10, type: 'seconds' },
+      // { each: 5, type: 'minutes' },
+      // { each: 1, type: 'hours' },
+      { each: 1, type: 'minutes' },
+      // { at: 10, type: 'hours' },
+    ],
+  });
+
+  Job.on('task', async(job, {each=0,type='n/a'})=>{
+
+    // return;
+
+    // const statuses = App.getModel('Order').getStatuses();
+    // const ageOfOrderDate = App.getModel('Order').getDefaultMaxAgeOfOrder();
+
+    // const mOrders = await App.getModel('Order').findAll({
+    //   attributes: [
+    //     'id','status','paymentIntentId','clientId','courierId',
+    //     'isPaid', // 'paidAt',
+    //     'isPaymentRequestAllowed', // 'paymentRequestAllowedAt',
+    //     'isPaymentRequested', // 'paymentRequestedAt',
+    //     'isClientActionRequired', // 'clientActionRequiredAt',
+    //   ],
+    //   where: {
+    //     status: statuses['processing'],
+    //     // courierId: null,
+    //     isCanceledByClient: false,
+    //     allSuppliersHaveConfirmed: true,
+    //     // paymentIntentId: { [ App.DB.Op.not ]: null },
+    //     isPaymentRequestAllowed: true,
+    //     isPaymentRequested: false,
+    //     isClientActionRequired: false,
+    //   },
+    //   include: [
+    //     {
+    //       required: true,
+    //       model: App.getModel('OrderPaymentType'),
+    //       attributes: { exclude: ['createdAt','updatedAt'] },
+    //       // include: [{
+    //       //   required: false, // Can be null; if(GooglePay || ApplePay)
+    //       //   model: App.getModel('PaymentCard'),
+    //       // }],
+    //     },
+    //     {
+    //       required: true,
+    //       model: App.getModel('OrderSupplier'),
+    //       attributes: ['id','restaurantId']
+    //     },
+    //   ],
+    //   order: [['id','asc']],
+    //   limit: 30,
+    // });
+
+    // if( !App.isArray(mOrders) || !mOrders.length )
+    //   return;
+
+    // job.line();
+    // job.log('start');
+
+    // for( const mOrder of mOrders ){
+    //   try{
+
+    //     job.debug(` exec: [intent-confirm]: ${mOrder.paymentIntentId}`);
+    //     const paymentIntentConfirmRes = await App.payments.stripe.paymentIntentConfirm( mOrder.paymentIntentId );
+
+    //     // TODO: add validation: [server-error] vs [logic/payment-error]
+
+    //     if( !paymentIntentConfirmRes.success ){
+    //       job.error(` #stripe: paymentIntentConfirmRes: ${paymentIntentConfirmRes.message}`);
+    //       console.json({paymentIntentConfirmRes});
+
+    //       const updateOrderActionRes = await mOrder.update({
+    //         isPaymentRequested: true,
+    //         paymentRequestedAt: App.getISODate(),
+    //       });
+
+    //       if( !App.isObject(updateOrderActionRes) || !App.isPosNumber(updateOrderActionRes.id) ){
+    //         job.error(` #failed update order: ${mOrder.id}`);
+    //       }
+
+    //       return;
+    //     }
+
+    //     job.ok(` #stripe: paymentIntentConfirmRes: ${paymentIntentConfirmRes.message}`);
+
+    //     const updateOrderStateRes = await mOrder.update({
+    //       isClientActionRequired: false,
+    //       clientActionRequiredAt: null,
+    //       isPaymentRequestAllowed: false,
+    //       paymentRequestAllowedAt: null,
+    //       isPaymentRequested: true,
+    //       paymentRequestedAt: App.getISODate(),
+    //     });
+    //     job.debug({updateOrderStateRes});
+
+    //     if( !App.isObject(updateOrderStateRes) || !App.isPosNumber(updateOrderStateRes.id) ){
+    //       job.error(` #failed update order: ${mOrder.id}`);
+    //       return;
+    //     }
+
+    //     /*
+    //     {
+    //       // Moved to: [stripe-server][event]: 
+    //         /services/payments/stripe/event.handlers/<charge>/[ succeeded/captured ]  
+
+    //       const emptyClientCartRes = await App.getModel('Cart').emptyByClientId(mOrder.clientId);
+    //       console.json({emptyClientCartRes});
+
+    //       // const paymentSucceededPushRes = await App.getModel('ClientNotification')
+    //       //   .pushToClientById( mOrder.clientId, {
+    //       //     type: App.getModel('ClientNotification').getTypes()['paymentSucceeded'],
+    //       //     title: 'Order payment Succeeded', 
+    //       //     message: 'Thank you!',
+    //       //     data: {
+    //       //       orderId: mOrder.id,
+    //       //     }
+    //       //   });
+    //       // console.json({paymentSucceededPushRes});
+
+    //       const clientPaidOrderPushRes = await App.getModel('CourierNotification')
+    //         .pushToCourierById( mOrder.courierId, {
+    //           type: App.getModel('CourierNotification').getTypes()['clientPaidOrder'],
+    //           title: 'Order has been confirmed', 
+    //           message: 'Please wait for next notification from the Restaurant',
+    //           data: {
+    //             orderId: mOrder.id,
+    //           }
+    //         });
+    //       console.json({clientPaidOrderPushRes});
+
+    //       const ackTimeout = (10*1000);
+    //       const notifyData = {
+    //         ack: false, // true,
+    //         // event: App.getModel('RestaurantNotification').getEvents()['clientPaidOrder'],
+    //         // type: App.getModel('RestaurantNotification').getTypes()['clientPaidOrder'],
+    //         event: App.getModel('RestaurantNotification').getEvents()['orderHasBeenPaid'],
+    //         type: App.getModel('RestaurantNotification').getTypes()['orderHasBeenPaid'],
+    //         data: {
+    //           orderId: mOrder.id,
+    //           clientId: mOrder.clientId,
+    //           courierId: mOrder.courierId,
+    //         }, 
+    //       };
+
+    //       for( const mOrderSupplier of mOrder.OrderSuppliers ){
+    //         const notifyRes = await App.getModel('RestaurantNotification')
+    //           .notifyById( mOrderSupplier.restaurantId, notifyData, ackTimeout );
+    //         job.log(` #order: ${mOrder.id} => mOrderSupplier: ${mOrderSupplier.id}: notify: ${notifyRes.message}`);
+    //       }
+
+    //     }
+    //     */
+
+    //   }catch(e){
+    //     job.error(`#order: ${mOrder.id}: (payment-loop): ${e.message}`);
+    //   }
+    // }
+
+    // // const mOrderPaymentType = await App.getModel('OrderPaymentType').findOne({
+    // //   where: { orderId: mRequest.Order.id }
+    // // });
+
+    // // if( !App.isObject(mOrderPaymentType) || !App.isPosNumber(mOrderPaymentType.id) ){
+    // //   job.error(` failed to get OrderPaymentType`);
+    // //   console.json({mRequest});
+    // //   return;
+    // // }
+
+    // job.info(`job: ${job.name}: done.`);
+
+  });
+
+  // Job.start();
+  return Job;
+
+}
+

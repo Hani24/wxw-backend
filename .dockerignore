@@ -1,0 +1,19 @@
+./node_modules
+# logs/*/*.log
+# firebase/*.json
+./api.flowchart.md
+./check-syntax.recursively.sh
+./docker-compose.dev.yaml
+./docker-compose.rem.yaml
+./models.find-with-wrong-single-name.sh
+./models.list
+# pm2.rem.ecosystem.config.js
+# pm2.dev.ecosystem.config.js
+./pm2.update-server.sh
+./README.md
+./docker-common
+./package-lock.json.async*
+./package-lock.json.bak*
+./.dockerignore
+./.gitignore
+./.git

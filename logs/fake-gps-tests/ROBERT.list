@@ -1,0 +1,55 @@
+ROBERT
+
+https://www.google.com/maps/place/Lviv,+Lviv+Oblast,+Ukraine,+79000/@49.8484998,24.0258458,21z/data=!4m5!3m4!1s0x473add7c09109a57:0x4223c517012378e2!8m2!3d49.839683!4d24.029717
+lat=49.8484998, lon=24.0258458
+
+https://www.google.com/maps/place/Lviv,+Lviv+Oblast,+Ukraine,+79000/@49.8477875,24.0257793,21z/data=!4m5!3m4!1s0x473add7c09109a57:0x4223c517012378e2!8m2!3d49.839683!4d24.029717
+lat=49.8477875, lon=24.0257793
+
+https://www.google.com/maps/place/Lviv,+Lviv+Oblast,+Ukraine,+79000/@49.8471668,24.028586,21z/data=!4m5!3m4!1s0x473add7c09109a57:0x4223c517012378e2!8m2!3d49.839683!4d24.029717
+lat=49.8471668, lon=24.028586
+
+
+
+-- lat=49.8471668, lon=24.028586
+-- update Restaurants set lat=49.8471668, lon=24.028586 where id=9;
+select id, userId, name, lat,lon from Restaurants where id=9;
+
+-- Driver: zbw53j@block521.com, +18143511267
+-- lat=49.8484998, lon=24.0258458
+-- update Couriers set lat=49.8484998, lon=24.0258458 where id=2;
+-- update Users set lat=49.8477875, lon=24.0257793 where id = 16;
+select id, email, phone, lat,lon from Users where id = 16;
+select id, userId, lat, lon, isOnline, isRestricted from Couriers where id=2 order by id desc;
+
+-- Сlient: robert.turchyn@interexy.com, +14844578685
+-- lat=49.8477875, lon=24.0257793
+
+-- update Users set lat=49.8477875, lon=24.0257793 where phone='+14844578685';
+-- update Clients set lat=49.8477875, lon=24.0257793 where userId=7;
+select id, email, phone, lat,lon from Users where phone='+14844578685';
+select id, lat,lon from Clients where userId=7;
+
+-- update DeliveryAddresses set lat=49.8477875, lon=24.0257793 where clientId=2;
+select id, lat,lon, isDefault, label from DeliveryAddresses where clientId=2;
+
+
+
+id,userId,name,lat,lon
+9,15,Taco Bell,49.84716680,24.02858600
+
+id,email,phone,lat,lon
+16,zbw53j@block521.com,+18143511267,49.84778750,24.02577930
+
+id,userId,lat,lon,isOnline,isRestricted
+2,16,49.84849980,24.02584580,1,0
+
+id,email,phone,lat,lon
+7,robert.turchyn@interexy.com,+14844578685,49.84778750,24.02577930
+
+id,lat,lon
+2,49.8478,24.0258
+
+id,lat,lon,isDefault,label
+17,49.8478,24.0258,1,Home
+

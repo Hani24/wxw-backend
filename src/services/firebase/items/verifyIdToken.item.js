@@ -1,0 +1,58 @@
+
+module.exports = (App, name, params={}) => {
+  return async (idToken) => {
+    try {
+      const decodedToken = await App.firebase.admin.auth().verifyIdToken(idToken);
+      
+      // Add FCM token validation
+      if (params.validateFCMToken) {
+        const isValid = await App.firebase.admin.messaging().send({
+          token: decodedToken.fcmToken,
+          data: { validation: 'true' }
+        }, true);
+        
+        if (!isValid) throw new Error('Invalid FCM token');
+      }
+
+      return { success: true, data: decodedToken };
+    } catch (error) {
+      console.error(`#firebase: [${name}]: ${error.message}`);
+      return { 
+        success: false, 
+        code: error.code || 'AUTH_ERROR',
+        message: error.message 
+      };
+    }
+  }
+}
+/*
+const idToken = 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiMGNiMTk5Zjg3MGYyOGUyOTg5YWI0ODFjYzJlNDdlMGUyY2MxOWQiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vZGV2LXJhdGluZy1wcm8iLCJhdWQiOiJkZXYtcmF0aW5nLXBybyIsImF1dGhfdGltZSI6MTYyMzM4Mzg1OSwidXNlcl9pZCI6InpoS2k3cnZ4ZXhWelNiQXhvZEdFN1RxZEUweTIiLCJzdWIiOiJ6aEtpN3J2eGV4VnpTYkF4b2RHRTdUcWRFMHkyIiwiaWF0IjoxNjIzMzgzODU5LCJleHAiOjE2MjMzODc0NTksInBob25lX251bWJlciI6IiszODAxMjM0NTY3ODkiLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7InBob25lIjpbIiszODAxMjM0NTY3ODkiXX0sInNpZ25faW5fcHJvdmlkZXIiOiJwaG9uZSJ9fQ.DhWSZWT7tCbjzaQRfC5jhyHN5YM7BsVVr3zfVIyTzIFN1XGMbuR7LgEGpnZ1cNxe8kZkBH9A276Z8OoqXIcxXu2Qk09CRu0P7rZY0iwo_w2yh32Jc0mCeGKpMJUOqgNuG4TtDYrX7HbcodtOHJ3WySac_WWPlCcHYyKVgBssqdiszopDieIFlDAdp1w6fsft1GfsqSqDG27_hx9sgObZJClAXykrT1Kp84aTXpBy4YJBybSDRnBfHB84cFLPWVkWaePBW6aTPIALExX8N2NP0MMAqfibCOHPZ0f5RYUg9POciaHaZ-EMGL_hEN29iIlWd2-1AAP0q2BiLSqbu7wYGg';
+
+console.json({
+  idToken: await App.firebase.verifyIdToken( idToken ),
+});
+
+{
+  "idToken": {
+    "iss": "https://securetoken.google.com/<project-name>",
+    "aud": "<project-name>",
+    "auth_time": 1623383859,
+    "user_id": "zhKi7rvxexVzSbAxodGE7TqdE0y2",
+    "sub": "zhKi7rvxexVzSbAxodGE7TqdE0y2",
+    "iat": 1623383859,
+    "exp": 1623387459,
+    "phone_number": "+380123456789",
+    "firebase": {
+      "identities": {
+        "phone": [
+          "+380123456789"
+        ]
+      },
+      "sign_in_provider": "phone"
+    },
+    "uid": "zhKi7rvxexVzSbAxodGE7TqdE0y2"
+  }
+}
+
+
+*/

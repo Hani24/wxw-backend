@@ -1,0 +1,227 @@
+const express = require('express');
+const router = express.Router();
+
+/*
+{
+  "firstName": "optional: <string>",
+  "lastName": "optional: <string>",
+  "birthday": "optional: <string> | ISO-8601: eg: 1988-09-18",
+  "email": "optional: <string>: must be revalidated if changed"
+}
+
+{
+  "firstName": "Slavik",
+  "lastName": "Timoschenko",
+  "birthday": "1988-09-18",
+  "email": "ch3ll0v3k@yandex.com"
+}
+
+{
+  "firstName": "Slavik",
+  "lastName": "Timoschenko",
+  "birthday": "1988-09-18",
+  "email": "881809@gmail.com"
+}
+*/
+
+// /private/client/profile/update/
+
+module.exports = function(App, RPath){
+
+  router.use('', /*App.multer.upload.tmp.any(),*/ async(req, res)=>{
+
+    try{
+
+      // const uploadRes = await App.S3.moveUploadedFile( req, 'image', mUser );
+      // if( !uploadRes.success )
+      //   return App.json(res, 417, App.t( uploadRes.message, req.lang) );
+      // uploadRes.data.fileName
+
+      const data = req.getPost();
+      const mUser = await req.user;
+      const mClient = await req.client;
+      let emailHasBeenUpdated = false;
+
+      const mCourier = await App.getModel('Courier').findOne({
+        where: {
+          userId: mUser.id,
+          isDeleted: false,
+        },
+        attributes: [
+          'id',
+          'isVerified','verifiedAt',
+          'isRequestSent','requestSentAt',
+          'isRestricted','restrictedAt',
+        ]
+      });
+
+      if( App.isObject(mCourier) && App.isPosNumber(mCourier.id) ){
+
+        if( App.isPosNumber(mCourier.isRequestSent) ){
+          const verifyAccess = App.getModel('Courier').verifyAccess( mCourier );
+          if( !verifyAccess.success )
+            return App.json(res, 417, App.t(verifyAccess.message, req.lang),{
+              requestSentAt: mCourier.requestSentAt,
+            });
+        }
+          
+        if( mCourier.isVerified )
+          return App.json(res, 417, App.t(['your','account','has-been','verified'], req.lang), {
+            verifiedAt: mCourier.verifiedAt
+          });
+
+      }
+
+      const user_t = {
+        email: App.tools.normalizeEmail( req.getCommonDataString('email', mUser.email) ),
+        firstName: App.tools.cleanName(req.getCommonDataString('firstName', mUser.firstName), false),
+        lastName: App.tools.cleanName(req.getCommonDataString('lastName', mUser.lastName), false),
+        birthday: req.getCommonDataString('birthday', mUser.birthday || App.getISODate()),
+      };
+
+
+      if( user_t.email !== mUser.email ){
+
+        if( !App.tools.isValidEmail(user_t.email) )
+          return App.json(res, 417, App.t(['email-address','is','not','valid'], req.lang));
+
+        const doubleRecordRes = await App.getModel('User').findOne({
+          where: {
+            id: { [App.DB.Op.not]: mUser.id },
+            isDeleted: false,
+            isRestricted: false,
+            email: user_t.email,
+          }
+        });
+
+        if( App.isObject(doubleRecordRes) && App.isPosNumber(doubleRecordRes.id) )
+          return App.json(res, 417, App.t('user-with-email-already-exists', req.lang));
+
+        emailHasBeenUpdated = true;
+
+      }
+
+      if( !App.DT.isValidDatetime(user_t.birthday) )
+        return App.json(res, 417, App.t(['birthday','is-not','valid',',','please','use','ISO-8601'], req.lang));        
+
+      if( !App.DT.requireMinAge(user_t.birthday, App.getModel('User').getMinAge()) )
+        return App.json(res, 417, App.t('Customer must be at least 13 years old', req.lang));
+
+      if( user_t.birthday !== mUser.birthday )
+        user_t.birthday = App.DT.cleanUpBirthday(user_t.birthday, mUser.timezone );
+
+      const updateRes = await mUser.update({
+        ...user_t,
+        isNewUser: false,
+      });
+
+
+      if( !App.isObject(updateRes) || !App.isPosNumber(updateRes.id) )
+        return App.json( res, false, App.t(['failed','to','update','user','info'], req.lang));
+
+      // "customerId": "cus_KbgYP89ZbqNnx7",
+      if( !mClient.customerId ){ 
+        const stripeCustomerCreate = await App.payments.stripe.customerCreate({
+          email: mUser.email,
+          // phone: '',
+          name: `${mUser.firstName} ${mUser.lastName}`,
+          description: '',
+          metadata: {
+            userId: mUser.id,
+            clientId: mClient.id,
+          }
+        });
+
+        if( !stripeCustomerCreate.success ){
+          App.logger.fatal(`stripe.customerCreate`, {stripeCustomerCreate} );
+          console.error(`stripe.customerCreate`);
+          console.json({stripeCustomerCreate});
+        }else{
+          const setClientCustomerId = await mClient.update({ customerId: stripeCustomerCreate.data.id });
+          if( !App.isObject(setClientCustomerId) || !App.isPosNumber(setClientCustomerId.id) ){
+            App.logger.fatal(`failed to update: [Client.customerId]`, stripeCustomerCreate.data );
+            console.error(`failed to update: [Client.customerId]` );
+            console.json({stripeCustomerCreate});            
+          }
+        }
+
+      }else{
+
+        const stripeCustomerUpdate = await App.payments.stripe.customerUpdateById( mClient.customerId, {
+          email: mUser.email,
+          // phone: '',
+          name: `${mUser.firstName} ${mUser.lastName}`,
+          description: '',
+          metadata: {
+            userId: mUser.id,
+            clientId: mClient.id,
+            updatedAt: App.getISODate(),
+          }
+        });
+
+        if( !stripeCustomerUpdate.success ){
+          App.logger.fatal(`stripe.stripeCustomerUpdate`, {stripeCustomerUpdate} );
+          console.error(`stripe.stripeCustomerUpdate` );
+          console.json({stripeCustomerCreate});            
+        }
+
+      }
+
+      if( emailHasBeenUpdated ){
+
+        const code = App.BCrypt.randomSecureToken(12); // 64^12 => 
+
+        const mEmailVerification = await App.getModel('EmailVerification').create({
+          userId: mUser.id,
+          email: mUser.email,
+          code: code,
+        });
+
+        if( !App.isObject(mEmailVerification) || !App.isPosNumber(mEmailVerification.id) )
+          return App.json( res, false, App.t(['failed','to','create','email-verification'], req.lang));
+
+        // --------------------------
+        // const sendRes = await App.Mailer.send({
+        //   to: mUser.email,
+        //   subject: App.t('email-verification', req.lang),
+        //   data: await App.Mailer.createEmailTemplate('email-verification', { 
+        //     lang: req.lang,
+        //     code: code,
+        //     platform: 'web',
+        //     webPath: App.toAppPath( 'web', 'client.email-verification-verify', code),
+        //   })
+        // });
+
+        // if( !sendRes.success )
+        //   return App.json( res, sendRes.success, App.t( sendRes.message, req.lang) );
+        // --------------------------
+
+        await mUser.update({ isEmailVerified: false });
+
+        // destroy all open sessions
+        // await App.getModel('Session').destroy({
+        //   where: { userId: mUser.id }
+        // });
+
+        return App.json( res, true, App.t([
+          'we-have-sent-you-confirmation-email', 
+          'click-verify-email',
+        ], req.lang, ' ') /*,{code}*/);
+
+      }
+
+      App.json( res, true, App.t(['account','has-been','updated'], res.lang) );
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: '', autoDoc:{} };
+
+};
+
+

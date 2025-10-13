@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Notifications</title>
+
+  <!--
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+  -->
+
+  <script type="module">
+
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+    import { deleteToken, getMessaging, getToken, isSupported, onMessage } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging.js';
+
+    // const VAPID_KEY ='BJGjsn6-mnDpmd2ZYobkb9Il-w4UF1JmWZixPWBj4hkl_KzUW8WywC9aExFPXXKow_qAubAYQGEw7R-D6Vh8xew';
+    const VAPID_KEY ='BJGjsn6-mnDpmd2ZYobkb9Il-w4UF1JmWZixPWBj4hkl_KzUW8WywC9aExFPXXKow_qAubAYQGEw7R-D6Vh8xew';
+
+    // const secKey = 'PKBJGjsn6-mnDpmd2ZYobkb9Il-w4UF1JmWZixPWBj4hkl_KzUW8WywC9aExFPXXKow_qAubAYQGEw7R-D6Vh8xew'
+    // const pubKey = '82XpasI_ni_SioRP3bTWw1HGzw7l2xGht-8Fjnza6wE';
+
+    const app = initializeApp({
+      apiKey: "AIzaSyBmftJf1PgDW5rPasJRpcZIq0Cff_UAOQk",
+      authDomain: "morris-armstrong.firebaseapp.com",
+      projectId: "morris-armstrong",
+      databaseURL: 'https://morris-armstrong.firebaseio.com',
+      storageBucket: "morris-armstrong.appspot.com",
+      messagingSenderId: "126255475624",
+      appId: "1:126255475624:web:649ad2c9918f524f230b9d",
+      measurementId: 'G-measurement-id',
+    });
+
+    const messaging = getMessaging(app);
+
+    onMessage(messaging, (payload) => {
+      console.log('#sw: [fg]: message:', payload);
+      // ...
+    });
+
+    console.log( await getToken( messaging, {vapidKey: VAPID_KEY} ) );
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/firebase-messaging-sw.js", {scope: '/', /* type: 'module' */ })
+        .then(async(mReg)=>{
+          console.log("Registration successful, scope is:", mReg.scope);
+          try{
+            // const tokenRes = await getToken( messaging, {vapidKey: VAPID_KEY, serviceWorkerRegistration: mReg })
+            // console.log({tokenRes});
+          }catch(err){
+            console.log('An error occurred while retrieving token. ', err);
+            console.log(err);
+          }
+        }).catch(function(err) {
+          console.log("Service worker mReg failed, error:" , err );          
+          console.log(err);
+        });
+
+    }
+
+  </script>
+
+</head>
+<body>
+
+</body>
+</html>

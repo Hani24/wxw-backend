@@ -1,0 +1,16 @@
+[
+  {
+    "id": 10000000223,
+    "deliveryAddressId": 16
+  },
+  {
+    "id": 10000000223,
+    "paymentCardId": 35,
+    "type": "Card",
+    "paymentTypes": {
+      "ApplePay": "ApplePay",
+      "GooglePay": "GooglePay",
+      "Card": "Card"
+    }
+  }
+]

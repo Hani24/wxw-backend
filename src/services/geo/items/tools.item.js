@@ -1,0 +1,315 @@
+const logger = require('mii-logger.js');
+const geolib = require('geolib');
+const Axi = require('../../Axi');
+
+const GEO_TOOLS_NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+
+// const GEO_TOOLS_GOOGLE_TO_OSM_LAT_CONST = (50.8479425 - 50.84625); // +- ( - 0.0016925000000043156)
+// const GEO_TOOLS_GOOGLE_TO_OSM_LON_CONST = (3.6150317 - 3.61297); // +- ( - 0.002061700000000055)
+
+// const GEO_TOOLS_GOOGLE_TO_OSM_LAT_CONST = (50.8479425 - 50.84625); // +- ( - 0.0016925000000043156)
+// const GEO_TOOLS_GOOGLE_TO_OSM_LON_CONST = (3.6150317 - 3.61297); // +- ( - 0.002061700000000055)
+
+const GEO_TOOLS_GOOGLE_TO_OSM_LAT_CONST = 0;
+const GEO_TOOLS_GOOGLE_TO_OSM_LON_CONST = 0;
+
+// https://wiki.openstreetmap.org/wiki/Nominatim/Country_Codes
+// https://nominatim.openstreetmap.org/reverse.php?lat=50.8453947&lon=3.61182271&zoom=16&format=jsonv2
+
+// Same street/place => will produce coords with offset
+//   https://www.openstreetmap.org/#map=19/50.84607/3.61263
+//   https://www.google.com/maps/place/Eindrieskaai,+9700+Oudenaarde/@50.8478472,3.6148553,19z
+
+// -- update Restaurants set timezone='America/Los_Angeles';
+
+// -- update Restaurants set lat=((34.0938)+((rand()/200)-(rand()/200))), lon=((-118.413)+((rand()/200)-(rand()/200)));
+// -- update Clients set lat=((34.0938)+((rand()/200)-(rand()/200))), lon=((-118.413)+((rand()/200)-(rand()/200)));
+// -- update Couriers set lat=((34.0938)+((rand()/200)-(rand()/200))), lon=((-118.413)+((rand()/200)-(rand()/200)));
+// -- update Users set lat=((34.0938)+((rand()/200)-(rand()/200))), lon=((-118.413)+((rand()/200)-(rand()/200)));
+
+// select id, name, lat, lon from Restaurants;
+// select id, lat, lon from Clients;
+// select id, lat, lon from Couriers;
+// -- select id, lat, lon from Users;
+
+class Tools {
+
+  constructor( App, name, params={} ){
+    this.App = App;
+    this.name = name;
+    this.params = params;
+    this._isInited = false;
+    this.nominatim = null;
+    this._cooordsTypes = ['google','osm','leaflet'];
+    this._init();
+  }
+
+  _init(){
+    try{
+      // const M_KEY = this.App.getEnv('M_KEY');
+      this.nominatim = Axi( this.App, { base: GEO_TOOLS_NOMINATIM_BASE });
+      this.nominatim.addDefaultHeader('Accept-Language', 'en');
+      this.nominatim.addDefaultHeader('User-Agent', 'wxw/1.0 (qbdullahhqni@gmail.com)');
+      this._isInited = true;
+
+      // console.json({GEO_TOOLS_NOMINATIM_BASE});
+      // https://nominatim.openstreetmap.org
+      // https://nominatim.openstreetmap.org/search.php?format=jsonv2&accept-language=en&q=US+California+mill+valley+24+walnut+ave
+      // https://nominatim.openstreetmap.org/search.php?format=jsonv2&accept-language=en&q=belgium+oudenaarde+eindrieskaai
+
+      // const execRes = await this.nominatim.get(`/search.php?accept-language=en&format=jsonv2&q=${country}+${city}+${zip}+${street}`);
+      // 
+
+    }catch(e){
+      console.error(` #${this.name}: ${e.message}`);
+      return false;
+    }
+  }
+
+  isInited(){ return this._isInited; }
+
+  isValidCoordsType( type ){
+    try{
+      return this.App.isString(type) && this._cooordsTypes.includes(type);
+    }catch(e){
+      console.error(` #${this.name}: ${e.message}`);
+      return false;
+    }
+  }
+
+  getValidCoordsTypes(){
+    try{
+      return [ ...this._cooordsTypes ];
+    }catch(e){
+      console.error(` #${this.name}: ${e.message}`);
+      return [];
+    }
+  }
+
+  spaceTo20(data){
+    // return (data || '').replace(/ /g, '%20');
+    return (data || '').replace(/ /g, '+');
+  }
+
+  async getCoordsFromAddress( {country='US', state='', city='', zip='', street=''}={} ){
+    try{
+
+   const params = {
+      street: street,
+      city: city,
+      state: state,
+      country: country,
+      postalcode: zip,
+      format: 'jsonv2',
+      'accept-language': 'en',
+    };
+
+
+      country = encodeURI( this.spaceTo20(country) );
+      state = encodeURI( this.spaceTo20(state) );
+      city = encodeURI( this.spaceTo20(city) );
+      zip = encodeURI( this.spaceTo20(zip) );
+     street = encodeURI( this.spaceTo20(street) );
+
+console.debug(params);
+
+      //// const q = `${country}+${state}+${city}+${zip}+${street}`
+    //  // const q = `${country}+${state}+${city}+${street}`
+      const q = /*'US+'*/`${state}+${city}+${street}`
+        .replace(/[\'\"\{\}\[\]\(\)]/g, '+')
+        .replace(/\+\+/g, '+')
+
+//      console.debug({country, state, city, street, zip});
+  //    console.debug(q);
+const queryString = new URLSearchParams(params).toString();
+const execRes = await this.nominatim.get(`/search?${queryString}`);
+      //// const execRes = await this.nominatim.get(`/search.php?accept-language=en&format=jsonv2&q=${country}+${city}+${zip}+${street}`);
+      //const execRes = await this.nominatim.get(`/search.php?accept-language=en&format=jsonv2&q=${q}`);
+      //// console.json({getCoordsFromAddress: {execRes}});
+
+      if( !execRes.success || !this.App.isArray(execRes.data) || !execRes.data.length ){
+        console.json({execRes});
+        return {success: false, message: ['please','fill','in','correct','city','and','street','name']};
+      }
+
+      if( execRes.data.error ){
+        console.json({execRes});
+        return {success: false, message: execRes.data.error};
+      }
+
+      const execItems = execRes.data.filter((mItem)=>mItem.type==='residential');
+      const mAddress = execItems.length ? execItems[0] : execRes.data[0];
+      // console.json({mAddress});
+
+      const isValidCoordsRes = this.App.geo.lib.isValidCoords( mAddress );
+      if( !isValidCoordsRes.success ){
+        console.json({isValidCoordsRes});
+        return {success: false, message: ['please','fill','in','correct','city','and','street','name']};
+      }
+
+      return isValidCoordsRes;
+
+    }catch(e){
+      console.error(`#${this.name}:getCoordsFromAddress: ${e.message}`);
+      return {success: false, message: e.message};
+    }
+  }
+
+  async getAddressInfoByCoords(mCoords, type='osm'){
+
+    try{
+
+      const validCoordsRes = this.App.geo.lib.isValidCoords(mCoords);
+      if( !validCoordsRes.success ){
+        console.json({validCoordsRes});
+        return validCoordsRes;
+      }
+
+      switch(type.trim().toLowerCase()){
+        case 'google': 
+        case 'google-maps': 
+          // correct coords to match OSM/leaflet
+          // validCoordsRes.data.lat -= GEO_TOOLS_GOOGLE_TO_OSM_LAT_CONST;
+          // validCoordsRes.data.lon -= GEO_TOOLS_GOOGLE_TO_OSM_LON_CONST;
+          validCoordsRes.data.lat += GEO_TOOLS_GOOGLE_TO_OSM_LAT_CONST;
+          validCoordsRes.data.lon += GEO_TOOLS_GOOGLE_TO_OSM_LON_CONST;
+        break;
+
+        case 'osm':
+        case 'openstreetmap':
+        case 'leaflet':
+          // pass ...
+        break;
+      }
+
+      const {lat, lon} = validCoordsRes.data;
+
+      // 50.8470872 3.6138844 
+      // https://nominatim.openstreetmap.org/reverse?accept-language=en&format=jsonv2&lat=51.3&lon=3.05
+      // const execRes = await this.nominatim.get(`/reverse?accept-language=en&zoom=18&format=jsonv2&lat=${lat}&lon=${lon}`);
+      const execRes = await this.nominatim.get(`/reverse?zoom=18&format=jsonv2&lat=${lat}&lon=${lon}`);
+      // https://nominatim.openstreetmap.org/reverse.php?lat=50.8470872&lon=3.6138844&zoom=18&format=jsonv2
+      // https://nominatim.openstreetmap.org/reverse.php?lat=50.84678&lon=3.61327&zoom=18&format=jsonv2
+
+      // console.json({execRes});
+      if( !execRes.success ){
+        console.json({execRes});
+        return {success: false, message: ['failed-to','get','address','from','coords']};
+      }
+
+      if( execRes.data.error ){
+        console.json({execRes});
+        return {success: false, message: execRes.data.error};
+      }
+
+      const address_t = this.App.isObject(execRes.data.address) ? execRes.data.address : {};
+      const data = {
+        // boundingbox: execRes.data.boundingbox, // ["50.8460955","50.8470038","3.6126454","3.6138246"],
+        // place_id: execRes.data.place_id
+        // osm_type: execRes.data.osm_type
+        // osm_id: execRes.data.osm_id
+        category: execRes.data.category || false, // 'n/a', // "highway",
+        type: execRes.data.type || false, // 'n/a', // "residential",
+        addresstype: execRes.data.addresstype || false, // 'n/a', // "road",
+        name: execRes.data.name || false, // 'n/a', // "Eindrieskaai",
+        display_name: execRes.data.display_name || false, // 'n/a', // "Eindrieskaai, Oudenaarde, Oost-Vlaanderen, Vlaanderen, 9700, België / Belgique / Belgien",
+        lat: execRes.data.lat || false,
+        lon: execRes.data.lon || false,
+        address: {
+          house_number: address_t.house_number || false,
+          suburb: address_t.suburb || false, // "Kulparkiv",
+          borough: address_t.borough || false, // "Frankivskyi District",
+          municipality: address_t.municipality || false, // "Lviv Urban Hromada",
+          district: address_t.district || false, // "Lviv Raion",
+          road: address_t.road || false, // 'n/a', // "Eindrieskaai",
+          city_district: address_t.city_district || false, // 'n/a', // "Oudenaarde",
+          town: address_t.town || false, // 'n/a', // "Oudenaarde",
+          city: address_t.city || false, // 'n/a', // "Oudenaarde",
+          state: address_t.state || false, // 'n/a', // "Oost-Vlaanderen",
+          region: address_t.region || false, // 'n/a', // "Vlaanderen",
+          postcode: address_t.postcode || false, // 'n/a', // "9700",
+          country: address_t.country || false, // 'n/a', // "België / Belgique / Belgien",
+          country_code: address_t.country_code || false, // 'n/a', // "be"
+        },
+      };
+
+      return {success: true, message: ['success'], data};
+
+    }catch(e){
+      console.error(`#${this.name}:getAddressInfoByCoords: ${e.message}`);
+      return {success: false, message: e.message};
+    }
+
+  }
+
+}
+
+module.exports = (App, name, params={})=>{
+  return new Tools(App, name, params);
+}
+
+
+if( module.parent ) return;
+
+(async()=>{
+
+})();
+
+
+
+
+// streetNameByCoords: await App.geo.tools.getAddressInfoByCoords({ lat: 50.8479589, lon: 3.6150788 }, 'osm'),
+// "place_id": 192335287,
+// "licence": "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright",
+// "osm_type": "way",
+// "osm_id": 392656576,
+// "lat": "50.849525799999995",
+// "lon": "3.614932264880383",
+// "place_rank": 30,
+// "category": "leisure",
+// "type": "stadium",
+// "importance": 0.14778803910650132,
+// "addresstype": "leisure",
+// "name": "Burgemeester Thienpontstadion",
+// "display_name": "Burgemeester Thienpontstadion, Scheldekant, Volkegem, Oudenaarde, Oost-Vlaanderen, Vlaanderen, 9700, België / Belgique / Belgien",
+// "address": {
+//   "leisure": "Burgemeester Thienpontstadion",
+//   "road": "Scheldekant",
+//   "village": "Volkegem",
+//   "town": "Oudenaarde",
+//   "country": "Oudenaarde",
+//   "state": "Oost-Vlaanderen",
+//   "region": "Vlaanderen",
+//   "postcode": "9700",
+//   "country": "België / Belgique / Belgien",
+//   "country_code": "be"
+// },
+// "boundingbox": ["50.8488308","50.8502433","3.6136587","3.6161387"],
+
+// streetNameByCoords: await App.geo.tools.getAddressInfoByCoords({ lat: 50.84621, lon: 3.6128 }, 'google'),
+// "place_id": 136276692,
+// "licence": "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright",
+// "osm_type": "way",
+// "osm_id": 151118576,
+// "lat": "50.84621278103064",
+// "lon": "3.61279786068028",
+// "place_rank": 26,
+// "category": "highway",
+// "type": "residential",
+// "importance": 0.09999999999999998,
+// "addresstype": "road",
+// "name": "Eindrieskaai",
+// "display_name": "Eindrieskaai, Oudenaarde, Oost-Vlaanderen, Vlaanderen, 9700, België / Belgique / Belgien",
+// "address": {
+//   "road": "Eindrieskaai",
+//   "city_district": "Oudenaarde",
+//   "town": "Oudenaarde",
+//   "country": "Oudenaarde",
+//   "state": "Oost-Vlaanderen",
+//   "region": "Vlaanderen",
+//   "postcode": "9700",
+//   "country": "België / Belgique / Belgien",
+//   "country_code": "be"
+// },
+// "boundingbox": ["50.8460955","50.8470038","3.6126454","3.6138246"],
+

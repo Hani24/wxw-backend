@@ -1,0 +1,110 @@
+<div>
+
+  <div class="section-title">
+    #{name}
+  </div>
+
+  <div class="share-row">
+    <img src="{ogImage}" class="share-restaurant-image" />
+  </div>
+
+  <div class="share-line"></div>
+
+  <div class="share-row">
+    <div class="share-row-title">#Description</div>
+    <div class="share-row-content">{ogDescription}</div>
+  </div>
+
+  <div class="share-line"></div>
+
+  <div class="share-row">
+    <div class="share-row-title">#Open Restaurant in:</div>
+    <div class="share-row-content">
+      iOS: <a href="" id="ios-open-restaurant">{appName} - {name}</a>
+    </div>
+    <div class="share-row-content">
+      Android: <a href="" id="android-open-restaurant">{appName} - {name}</a>
+    </div>
+  </div>
+
+  <div class="share-line"></div>
+
+  <div class="share-row">
+    <div class="share-row-title">#Bussiness hours</div>
+    <div class="share-row-content" id="bussiness-hours"></div>
+  </div>
+
+  <div class="share-line"></div>
+
+  <div class="share-row">
+    <div class="share-row-title">Download app from App-Store</div>
+    <div class="share-row-content">
+      <a target="_blank" href="" id="ios-appLink">
+        <img src="" id="ios-storeIcon" class="download-app-image" />
+      </a>
+    </div>
+  </div>
+
+  <div class="share-row">
+    <div class="share-row-title">Download app from Google-Play</div>
+    <div class="share-row-content">
+      <a target="_blank" href="" id="android-appLink">
+        <img src="" id="android-storeIcon" class="download-app-image" />
+      </a>
+    </div>
+  </div>
+
+  <div class="share-line"></div>
+
+  <div class="share-row">
+    <div class="share-row-title">#Address && Contacts</div>
+    <div class="share-row-content" id="address-and-contacts"></div>
+  </div>
+
+</div>
+
+<script type="text/javascript">
+  const data = {data};
+  window.addEventListener('load',()=>{
+
+    for( const type_t of ['ios','android'] ){
+      console.log({type_t});
+      document.getElementById(`${type_t}-appLink`).href = data[ type_t ].appLink;
+      document.getElementById(`${type_t}-storeIcon`).src = data[ type_t ].storeIcon;
+      document.getElementById(`${type_t}-open-restaurant`).href = data[ type_t ]['open-restaurant'];
+    }
+
+    const weekDays = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    document.getElementById('bussiness-hours').innerHTML = `
+      <table class="working-time-table">
+        <thead>
+          <tr> <th>Day</th> <th>AM</th> <th>PM</th> </tr>
+        </thead>
+        <tbody>
+          ${ weekDays.map((dayName)=>{
+            const mDay = data.workingTime[ dayName ];
+            const isOpen = mDay.isOpen;
+            const openAt = isOpen ? mDay.openAt : '---';
+            const closeAt = isOpen ? mDay.closeAt : '---';
+            return `<tr><td>${dayName}</td> <td>${openAt} AM</td> <td>${closeAt} PM</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    document.getElementById('address-and-contacts').innerHTML = `
+      <table class="working-time-table">
+        <tbody>
+          <tr><td>Is Open</td> <td>{isOpen}</td></tr>
+          <tr><td>City</td> <td>${data.restaurant.City.name}</td></tr>
+          <tr><td>Street</td> <td>${data.restaurant.street}</td></tr>
+          <tr><td>Zip</td> <td>${data.restaurant.zip}</td></tr>
+          <tr><td>Type</td> <td>${data.restaurant.type}</td></tr>
+          <tr><td>Email</td> <td>${data.restaurant.email}</td></tr>
+          <tr><td>Phone</td> <td>${data.restaurant.phone}</td></tr>
+        </tbody>
+      </table>
+    `;
+  });
+
+</script>

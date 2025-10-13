@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>leaf-let</title>
+
+     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+       integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
+
+     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+       integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+
+    <style type="text/css">
+      #my-leaft-let-element-map{
+        height: 650px; 
+      }
+      
+    </style>
+
+    <script type="text/javascript">
+
+      const mInfo = {
+        "distance": 34.84,
+        "units": "kms",
+        "pathRes": [
+          { nextPointDist: 4.23, id: 0, latitude: 10, longitude: 10, lat: 10, lon: 10},
+          { nextPointDist: 7.23, id: 5, latitude: 9.965, longitude: 9.985, lat: 9.965, lon: 9.985},
+          { nextPointDist: 10.23, id: 2, latitude: 9.91, longitude: 10.02, lat: 9.91, lon: 10.02},
+          { nextPointDist: 13.79, id: 4, latitude: 9.985, longitude: 10.074, lat: 9.985, lon: 10.074},
+          { nextPointDist: 3.88, id: 6, latitude: 10.025, longitude: 9.955, lat: 10.025, lon: 9.955},
+          { nextPointDist: 13.4, id: 3, latitude: 10.03, longitude: 9.92, lat: 10.03, lon: 9.92},
+          { nextPointDist: 0, id: 1, latitude: 9.91, longitude: 9.91, lat: 9.91, lon: 9.91}
+        ]
+      };
+
+      window.addEventListener('load',()=>{
+        const map = L.map('my-leaft-let-element-map').setView([10, 10], 12);
+
+        L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+          attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+          maxZoom: 18,
+          id: 'mapbox/streets-v11',
+          tileSize: 512,
+          zoomOffset: -1,
+          accessToken: 'pk.eyJ1IjoiY2gzbGwwdjNrIiwiYSI6ImNqZmp5bnR3MzZtdnYyeHBkd3h4eHZqemgifQ.3Ggte-zpmwQv2_Mfnc1hbA'
+        }).addTo(map);
+
+        // var circle = L.circle([51.508, -0.11], {
+        //   color: 'red',
+        //   fillColor: '#f03',
+        //   fillOpacity: 0.5,
+        //   radius: 500
+        // }).addTo(map);
+
+        const polygon = L.polygon( mInfo.pathRes.map((mPoint)=>{
+
+          // L.popup()
+          //   .setLatLng([mPoint.lat, mPoint.lon])
+          //   .setContent(`lat: ${mPoint.lat}, lon: ${mPoint.lon}`)
+          //   .openOn(map);
+
+          return [mPoint.lat, mPoint.lon];
+        }) ).addTo(map);
+
+      });
+
+    </script>
+
+  </head>
+  <body>
+
+    <div id="my-leaft-let-element-map"></div>
+
+  </body>
+</html>

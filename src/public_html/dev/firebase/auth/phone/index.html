@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Auth-Phone</title>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.7/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.7/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.7/firebase-firestore.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/ui/5.0.0/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/5.0.0/firebase-ui-auth.css" />
+
+  <script>
+
+    window.addEventListener('load',()=>{
+
+      firebase.initializeApp({
+        // ???
+        // databaseURL: "https://dev-rating-pro.firebaseio.com",
+        apiKey: "AIzaSyBmftJf1PgDW5rPasJRpcZIq0Cff_UAOQk",
+        authDomain: "morris-armstrong.firebaseapp.com",
+        projectId: "morris-armstrong",
+        storageBucket: "morris-armstrong.appspot.com",
+        messagingSenderId: "126255475624",
+        appId: "1:126255475624:web:649ad2c9918f524f230b9d"
+      });
+      // var db = firebase.firestore();
+
+      // Initialize the FirebaseUI Widget using Firebase.
+      const ui = new firebaseui.auth.AuthUI(firebase.auth())
+
+      ui.start('#firebaseui-auth-container', {
+        signInOptions: [
+          firebase.auth.PhoneAuthProvider.PROVIDER_ID
+        ],
+        // Other config options...
+      });
+
+      const uiConfig = {
+        callbacks: {
+          signInSuccessWithAuthResult: function(authResult, redirectUrl) {
+
+            authResult.user.getIdTokenResult().then((tokenResult) => {
+              console.log({ tokenResult });
+
+              // {
+              //   "tokenResult": {
+              //     "token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjdiODcxMTIzNzU0MjdkNjU3ZjVlMjVjYTAxZDU2NWU1OTJhMjMxZGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vbW9ycmlzLWFybXN0cm9uZyIsImF1ZCI6Im1vcnJpcy1hcm1zdHJvbmciLCJhdXRoX3RpbWUiOjE2MzI5NTM5NzUsInVzZXJfaWQiOiJuQ0w4SFBtTlpMV3ptd2RIT09qdHQ2Q21lZWgyIiwic3ViIjoibkNMOEhQbU5aTFd6bXdkSE9PanR0NkNtZWVoMiIsImlhdCI6MTYzMjk1Mzk3NSwiZXhwIjoxNjMyOTU3NTc1LCJwaG9uZV9udW1iZXIiOiIrMzI0OTg0MDM5OTQiLCJmaXJlYmFzZSI6eyJpZGVudGl0aWVzIjp7InBob25lIjpbIiszMjQ5ODQwMzk5NCJdfSwic2lnbl9pbl9wcm92aWRlciI6InBob25lIn19.HaPFK1D7czhL6pChO0pS70DWqAd1Y4Wm3VHsF-yBZ1u9em0JwwpEgJzTO_XA21jMQsqo0-jPMaHnmzA3ondBfmiHYDNuMMwopfX_GhGGIY4KfrFavGHVYiLkv1c6lTwFOAK3a_XP9Um-Z2dhvbOy-lTtV37LUfJ9ZiN3tqHKRdzp-XmvpS2Q75w6n3Vkp7GKzhU08XVygFoOk5dpVQVWba3CXY3QGgk3Ce9eVrYYO81Fwkm1w7-WUAhq_0IlwxT4vg1p7SBYQ0y86YRGwF0-c9nwpl5cjchuN7pF_XYIsWOKdv-6wrizNLUn6SQEA6icP2XS24MGBSLDG0hqfWRy-w",
+              //     "expirationTime": "Wed, 29 Sep 2021 23:19:35 GMT",
+              //     "authTime": "Wed, 29 Sep 2021 22:19:35 GMT",
+              //     "issuedAtTime": "Wed, 29 Sep 2021 22:19:35 GMT",
+              //     "signInProvider": "phone",
+              //     "signInSecondFactor": null,
+              //     "claims": {
+              //       "iss": "https://securetoken.google.com/morris-armstrong",
+              //       "aud": "morris-armstrong",
+              //       "auth_time": 1632953975,
+              //       "user_id": "nCL8HPmNZLWzmwdHOOjtt6Cmeeh2",
+              //       "sub": "nCL8HPmNZLWzmwdHOOjtt6Cmeeh2",
+              //       "iat": 1632953975,
+              //       "exp": 1632957575,
+              //       "phone_number": "+32498403994",
+              //       "firebase": {
+              //         "identities": {
+              //           "phone": [
+              //             "+32498403994"
+              //           ]
+              //         },
+              //         "sign_in_provider": "phone"
+              //       }
+              //     }
+              //   }
+              // }
+
+            });
+            // console.log({authResult, redirectUrl});
+            // User successfully signed in.
+            // Return type determines whether we continue the redirect automatically
+            // or whether we leave that to developer to handle.
+            return false; // false if => "Uncaught Error: No redirect URL has been found. You must either specify a signInSuccessUrl in the configuration, pass in a redirect URL to the widget URL, or return false from the callback."
+          },
+          uiShown: function() {
+            // The widget is rendered.
+            // Hide the loader.
+            document.getElementById('loader').style.display = 'none';
+          }
+        },
+        // Will use popup for IDP Providers sign-in flow instead of the default, redirect.
+        signInFlow: 'popup',
+        // signInSuccessUrl: 'http://localhost:20123/public/dev/firebase/auth/',
+        signInOptions: [
+          // Leave the lines as is for the providers you want to offer your users.
+          // firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+          // firebase.auth.FacebookAuthProvider.PROVIDER_ID,
+          // firebase.auth.TwitterAuthProvider.PROVIDER_ID,
+          // firebase.auth.GithubAuthProvider.PROVIDER_ID,
+          // firebase.auth.EmailAuthProvider.PROVIDER_ID,
+          firebase.auth.PhoneAuthProvider.PROVIDER_ID
+        ],
+        // Terms of service url.
+        tosUrl: '',
+        // Privacy policy url.
+        privacyPolicyUrl: ''
+      };
+
+      ui.start('#firebaseui-auth-container', uiConfig);
+
+    });
+
+  </script>
+
+</head>
+<body>
+
+
+  <h1>Welcome</h1>
+  <div id="firebaseui-auth-container"></div>
+  <div id="loader">Loading...</div>
+
+</body>
+</html>

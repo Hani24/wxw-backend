@@ -1,0 +1,139 @@
+const express = require('express');
+const router = express.Router();
+
+// /private/restaurant/order-requests/get/all/?offset=0&limit=15&order=asc
+
+module.exports = function(App, RPath){
+
+  router.post('', async(req, res)=>{
+
+    try{
+
+	        console.log('Starting order-requests handler with role:', req.user.role);
+    console.log('Restaurant details:', {
+      id: req.restaurant.id,
+      name: req.restaurant.name,
+      isVerified: req.restaurant.isVerified,
+      status: req.restaurant.status
+    });
+	    console.log('Route accessed:', req.method, req.originalUrl);
+      console.log('Headers:', JSON.stringify(req.headers, null, 2));
+
+      const data = req.getPost();
+	     console.log('Request data:', data);
+      const mUser = await req.user;
+	     console.log('User data:', mUser ? `ID: ${mUser.id}, Authenticated: true` : 'User not authenticated');
+
+      const mRestaurant = await req.restaurant;
+	      console.log('Restaurant data:', mRestaurant ? `ID: ${mRestaurant.id}, Valid: true` : 'Restaurant not found/authenticated');
+
+	//change start
+	    if (!mUser || !mRestaurant) {
+      return App.json(res, false, App.t('unauthorized', res.lang), null, 403);
+   }	    
+	    //change end
+	
+      const {offset, limit, order, by} = req.getPagination({ order: 'asc'});
+      const orderBy = App.getModel('Order').getOrderBy(by);
+      const statuses = App.getModel('Order').getStatuses();
+
+      const mOrders = await App.getModel('Order').findAndCountAll({
+        where: {
+          isLocked: true,
+          allSuppliersHaveConfirmed: false,
+          isCanceledByClient: false,
+          // isRejectedByClient: false,
+          // status: statuses['processing'],
+          [ App.DB.Op.and ]: {
+            status: {
+              [ App.DB.Op.or ]: [
+                statuses.processing,
+                // statuses.refunded,
+                // statuses.canceled,
+                // statuses.delivered,
+                // statuses.discarded,
+              ]
+            }
+          }
+        },
+        distinct: true,
+        attributes: [
+          'id','status','createdAt',
+        ],
+        include: [
+          {
+            model: App.getModel('Courier'),
+            attributes: [
+              'id','isOnline','lat','lon',
+              'hasActiveOrder','activeOrderId',
+            ],
+            include: [{
+              model: App.getModel('User'),
+              attributes: [
+                'id','firstName','lastName','phone','email',
+              ],
+            }]
+          },
+          {
+            model: App.getModel('OrderSupplier'),
+            required: true,
+            where: {
+              restaurantId: mRestaurant.id,
+              isAcceptedByRestaurant: false,
+              isCanceledByRestaurant: false,
+              // isRestaurantNotified: true,
+              // isRestaurantAcknowledged: true,
+              isRequestCreated: true,
+            },
+            attributes: [
+              'id',
+              // 'isRestaurantNotified', // 'restaurantNotifiedAt',
+              // 'isRestaurantAcknowledged', // 'restaurantAcknowledgedAt',
+              'isAcceptedByRestaurant', // 'acceptedByRestaurantAt',
+              'isCanceledByRestaurant', // 'canceledByRestaurantAt', // + reason
+              'isRequestCreated',
+              'requestCreatedAt',
+              'requestTimeLeft',
+              // 'updatedAt'            
+              'totalPrice',
+              'totalItems',
+            ],
+            include: [{
+              model: App.getModel('OrderSupplierItem'),
+              attributes: [
+                'id','price','amount','totalPrice',
+              ],
+              include: [{
+                model: App.getModel('MenuItem'),
+                attributes: [
+                  'id','name','image','description','price',
+                  // 'kcal','proteins','fats','carbs',
+                  // 'rating','order',
+                  // 'createdAt',
+                ]
+              }]
+            }],
+          },
+        ],
+        order: [[ orderBy, order ]],
+        offset: offset,
+        limit: limit,
+      });
+
+      App.json( res, true, App.t('success', res.lang), mOrders);
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+	    console.log('Error in order-requests route:', e.message);
+    console.log('Error stack:', e.stack);
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: 'post', autoDoc:{} };
+
+};
+
+

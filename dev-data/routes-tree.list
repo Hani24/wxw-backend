@@ -1,0 +1,260 @@
+./src/routes
+├── private
+│   ├── administrator
+│   │   ├── advert-facility-types
+│   │   │   ├── create
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   ├── by
+│   │   │   │   │   ├── category
+│   │   │   │   │   │   └── id
+│   │   │   │   │   └── id
+│   │   │   │   └── grouped
+│   │   │   │       └── by
+│   │   │   │           └── categories
+│   │   │   └── update
+│   │   │       └── by
+│   │   │           └── id
+│   │   ├── categories
+│   │   │   ├── create
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   ├── by
+│   │   │   │   │   └── id
+│   │   │   │   └── populated
+│   │   │   │       └── all
+│   │   │   └── update
+│   │   │       └── by
+│   │   │           └── id
+│   │   ├── cities
+│   │   │   ├── create
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   ├── by
+│   │   │   │   │   └── id
+│   │   │   │   └── populated
+│   │   │   │       └── all
+│   │   │   └── update
+│   │   │       └── by
+│   │   │           └── id
+│   │   ├── districts
+│   │   │   ├── create
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   └── by
+│   │   │   │       ├── city
+│   │   │   │       │   └── id
+│   │   │   │       └── id
+│   │   │   └── update
+│   │   │       └── by
+│   │   │           └── id
+│   │   ├── specializations
+│   │   │   ├── create
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   └── by
+│   │   │   │       └── id
+│   │   │   └── update
+│   │   │       └── by
+│   │   │           └── id
+│   │   └── sub-categories
+│   │       ├── create
+│   │       ├── get
+│   │       │   ├── all
+│   │       │   └── by
+│   │       │       ├── category
+│   │       │       │   └── id
+│   │       │       └── id
+│   │       └── update
+│   │           └── by
+│   │               └── id
+│   ├── client
+│   │   ├── favorite-adverts
+│   │   │   ├── items
+│   │   │   │   └── add
+│   │   │   │       └── by
+│   │   │   │           └── advert
+│   │   │   │               └── id
+│   │   │   └── lists
+│   │   │       ├── create
+│   │   │       ├── delete
+│   │   │       │   └── by
+│   │   │       │       └── id
+│   │   │       ├── get
+│   │   │       │   ├── all
+│   │   │       │   └── by
+│   │   │       │       └── id
+│   │   │       └── update
+│   │   │           └── by
+│   │   │               └── id
+│   │   ├── instruments
+│   │   │   └── account
+│   │   │       └── switch-to
+│   │   │           └── specialist
+│   │   ├── notifications
+│   │   │   └── get
+│   │   │       ├── all
+│   │   │       └── types
+│   │   ├── profile
+│   │   │   ├── data
+│   │   │   │   ├── get
+│   │   │   │   └── update
+│   │   │   └── image
+│   │   │       └── upload
+│   │   ├── projects
+│   │   │   ├── get
+│   │   │   │   ├── all
+│   │   │   │   └── by
+│   │   │   │       └── id
+│   │   │   └── review
+│   │   │       └── create
+│   │   └── registration
+│   │       └── finalize
+│   ├── common
+│   │   └── upload
+│   │       ├── audio
+│   │       ├── document
+│   │       ├── get
+│   │       │   └── supported-mime-types
+│   │       │       ├── all
+│   │       │       ├── audio
+│   │       │       ├── document
+│   │       │       ├── image
+│   │       │       └── video
+│   │       ├── image
+│   │       └── video
+│   ├── manager
+│   │   └── tasks
+│   │       └── verification
+│   │           └── requests
+│   │               ├── approve
+│   │               │   └── by
+│   │               │       └── id
+│   │               ├── get
+│   │               │   ├── all
+│   │               │   └── by
+│   │               │       └── id
+│   │               └── reject
+│   │                   └── by
+│   │                       └── id
+│   ├── root
+│   └── specialist
+│       ├── instruments
+│       │   ├── account
+│       │   │   └── switch-to
+│       │   │       └── client
+│       │   └── adverts
+│       │       ├── create
+│       │       ├── delete
+│       │       │   └── by
+│       │       │       └── id
+│       │       ├── get
+│       │       │   ├── all
+│       │       │   └── by
+│       │       │       └── id
+│       │       └── update
+│       │           └── by
+│       │               └── id
+│       ├── notifications
+│       │   └── get
+│       │       ├── all
+│       │       └── types
+│       ├── profile
+│       │   ├── data
+│       │   │   ├── get
+│       │   │   └── update
+│       │   └── image
+│       │       └── upload
+│       ├── projects
+│       │   ├── create
+│       │   ├── get
+│       │   │   ├── all
+│       │   │   └── by
+│       │   │       └── id
+│       │   └── visits
+│       │       ├── add
+│       │       └── delete
+│       │           └── by
+│       │               └── id
+│       └── verification
+│           └── account
+│               ├── get
+│               │   └── status
+│               └── request
+└── public
+    ├── advert-facility-types
+    │   └── get
+    │       ├── all
+    │       ├── by
+    │       │   ├── category
+    │       │   │   └── id
+    │       │   └── id
+    │       └── grouped
+    │           └── by
+    │               └── categories
+    ├── adverts
+    │   ├── find
+    │   │   └── all
+    │   └── get
+    │       └── by
+    │           └── id
+    ├── categories
+    │   └── get
+    │       ├── all
+    │       └── by
+    │           └── id
+    ├── cities
+    │   └── get
+    │       ├── all
+    │       ├── by
+    │       │   └── id
+    │       └── _populated
+    │           └── all
+    ├── dev
+    │   └── ui
+    │       └── test
+    │           ├── error
+    │           └── success
+    ├── districts
+    │   └── get
+    │       ├── al
+    │       ├── all
+    │       └── by
+    │           ├── city
+    │           │   └── id
+    │           └── id
+    ├── services
+    │   └── firebase
+    │       └── auth
+    │           └── phone
+    ├── specialist
+    │   └── find
+    │       └── all
+    ├── specializations
+    │   └── get
+    │       ├── all
+    │       └── by
+    │           └── id
+    ├── sub-categories
+    │   └── get
+    │       ├── all
+    │       └── by
+    │           ├── category
+    │           │   └── id
+    │           └── id
+    ├── system
+    │   ├── genders
+    │   └── langs
+    └── user
+        ├── access-recovery
+        │   └── verify
+        ├── email-verification
+        │   └── verify
+        ├── login
+        │   ├── request
+        │   └── verify
+        └── registration
+            ├── request
+            └── verify
+
+257 directories

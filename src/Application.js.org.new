@@ -1,0 +1,956 @@
+const os = require('os');
+const fs = require('fs');
+const { fork } = require('child_process');
+
+const FormData = require('form-data');
+const server = require( './web-server');
+const express = require('./express');
+const DB = require('./DB');
+const upload = require('./app-upload');
+const apiPaths = require('./api-paths');
+const appPaths = require('./app-paths');
+const setUpForeignKeys = require('./DB/setUpForeignKeys');
+
+const APP_NAME = process.env.APP_NAME;
+const PROTOCOL = process.env.PROTOCOL;
+const DOMAIN = process.env.DOMAIN;
+const SUB_DOMAIN = process.env.SUB_DOMAIN;
+const HOST = process.env.HOST;
+const PORT = process.env.PORT;
+const PROTOHOST = process.env.PROTOHOST;
+const PROTODOMAIN = process.env.PROTODOMAIN;
+const WEBSITE = process.env.WEBSITE;
+
+module.exports = Application = class Application{
+
+  constructor(params={}){
+
+    this.params = params;
+    this.config = this._initConfig(params);
+
+    this.domain = this.config.domain;
+    this.protocol = this.config.protocol;
+    this.host = this.config.host;
+    this.port = this.config.port;
+    this.protohost = this.config.protohost; // <protocol>://<ip>:<port>
+    this.protodomain = this.config.protodomain; // <protocol>://<domain>:<port>
+
+    this.root = this.config.root;
+    this.app_root = this.config.app_root;
+    this.dicts_root = this.config.dicts_root;
+    this.public_html = this.config.public_html;
+    this.services_root = this.config.services_root;
+    this.logs_root = this.config.logs_root;
+
+    this.apiPaths = null;
+    this.appPaths = null;
+
+    this._isDaemon = this.config._isDaemon;
+    this._daemon = null;
+    this._daemonPath = this.config.daemonPath;
+    this._daemonPath = this.config.daemonPath;
+    this._enableDaemond = this.config.enableDaemond;
+    this._event_subs = {};
+    this._nodeUID = 0; // 'aaaaaaaaaaaaaaaaaaaaaaaa'; // 0;
+
+    this._init();
+
+  }
+
+  getNodeUID(){ return this._nodeUID; }
+
+  getConfig( asPinter=false ){
+    return (asPinter ? this.config : console.deepClone( this.config ));
+  }
+
+  _initConfig( params ){
+
+    params = console.deepClone( this.isObject(params) ? params : {} );
+    const root = params.root || `${__dirname}/..`;
+    const app_root = `${root}/src`;
+
+    this.config = {
+      ...params,
+      domain: params.domain || DOMAIN,
+      protocol: params.protocol || PROTOCOL,
+      host: params.host || HOST,
+      port: params.port || PORT,
+      protohost: params.protohost || PROTOHOST,
+      protodomain: params.protodomain || PROTODOMAIN,
+      root,
+      app_root,
+      public_html: `${root}${ params.public_html || '/src/public_html' }`,
+      services_root: `${root}${ params.services_root || '/src/services' }`,
+      logs_root: `${root}${ params.logs || '/logs' }`,
+      dicts_root: `${app_root}${ params.dicts_root || '/DB/dicts' }`,
+      useStrictPath: this.getBoolFromValue( this.isBoolean(params.useStrictPath) ? params.useStrictPath : false ),
+      runPostBootTasks: this.getBoolFromValue( this.isBoolean(params.runPostBootTasks) ? params.runPostBootTasks : true ),
+      useMiddlewares: this.getBoolFromValue( this.isBoolean(params.useMiddlewares) ? params.useMiddlewares : true ),
+      useAutoRouter: this.getBoolFromValue( this.isBoolean(params.useAutoRouter) ? params.useAutoRouter : true  ),
+      enableDaemond: this.getBoolFromValue( this.isBoolean(params.enableDaemond) ? params.enableDaemond : false ),
+      daemonServices: (this.isArray(params.daemonServices) ? params.daemonServices : []), 
+      socketServer: (this.isObject(params.socketServer) ? params.socketServer : {}), 
+      mainServices: (this.isArray(params.mainServices) ? params.mainServices : []), 
+      nodes: {
+        ...(this.isObject(params.nodes)?params.nodes:{}),
+        master: {
+          ...(this.isObject(params.nodes.master)?params.nodes.master:{}),
+          services: [
+            ...(this.isArray(params.nodes.master.services)?params.nodes.master.services:[]),
+          ],
+          params: {
+            ...(this.isObject(params.nodes.master.params)?params.nodes.master.params:{}),
+          },
+        },
+        api: {
+          ...(this.isObject(params.nodes.api)?params.nodes.api:{}),
+          services: [
+            ...(this.isArray(params.nodes.api.services)?params.nodes.api.services:[]),
+          ],
+          params: {
+            ...(this.isObject(params.nodes.api.params)?params.nodes.api.params:{}),
+          },
+        },
+      },
+      // [inner]
+      _daemonPath: params.daemonPath || `${app_root}/../index.js`,
+      _isDaemon: (process.argv.includes('APP_DAEMON') ? true : false),
+    };
+    // console.json({config: this.config});
+    return this.config;
+  }
+
+  isNodeOfTypeEnabled( nodeType_t ){
+    return this.getConfig(false).nodes.hasOwnProperty(nodeType_t) 
+      && this.getConfig(false).nodes[ nodeType_t ].enabled;
+  }
+
+  getNodeConfigByType( nodeType_t ){
+    return this.getConfig(false).nodes.hasOwnProperty(nodeType_t) 
+      ? this.getConfig(false).nodes[ nodeType_t ]
+      : false;
+  }
+
+  async _init(){
+
+    this.upload = upload( this, {});
+    const appConfig = this.getConfig(true); // asPinter=true
+
+    this.S3 = await (require(`${appConfig.services_root}/${'S3'}`))( this, {} );
+
+    this.apiPaths = apiPaths( this, {});
+    this.appPaths = appPaths( this, {});
+
+    for( const service_t of appConfig.mainServices ){
+      console.ok(`   [main]: service: ${service_t} `);
+      this[ service_t ] = await (require(`${appConfig.services_root}/${ service_t }`))( this, {} );
+    }
+
+    this._nodeUID = (this.isString(this._nodeUID) && this._nodeUID.length == (12*2) /*2x:hex*/ ) 
+      ? this._nodeUID 
+      : await this.BCrypt.randomSecureToken(12);
+
+    console.line();
+    console.log(` #Application:_init: ${this.getNodeUID()}`);
+    this.logger.info(`[Application]: _init: ${this.getNodeUID()}`);
+
+    this.DB = await DB(this, {});
+    await setUpForeignKeys(this, {});
+
+    for( const nodeType_t of ['api','master'] ){
+
+      if( !this.isNodeOfTypeEnabled(nodeType_t) )
+        continue;
+
+      console.info(` init node: [${nodeType_t}]: `);
+      const nodeConfig = this.getNodeConfigByType( nodeType_t );
+
+      for( const service_t of nodeConfig.services ){
+        console.ok(`   node: [${nodeType_t}]: service: ${service_t} `);
+        this[ service_t ] = this.isUndefined(this[ service_t ])
+          ? await (require(`${appConfig.services_root}/${ service_t }`))( this, {} )
+          : this[ service_t ];
+      }
+
+      // [override] main-conf
+      const overrides = [
+        'useStrictPath','runPostBootTasks',
+        'useAutoRouter','useMiddlewares',
+      ];
+
+      for( const override of overrides){
+        if( this.isBoolean(nodeConfig.params[ override ]) ){
+          appConfig[ override ] = nodeConfig.params[ override ];
+        }
+      }
+
+      if( nodeType_t === 'api' ){
+        appConfig.socketServer.enabled = false;
+        // appConfig.socketServer.virtualConsole.enabled = false;
+      }
+
+      if( nodeType_t === 'master' ){
+        appConfig.socketServer.enabled = true;
+        // appConfig.socketServer.virtualConsole.enabled = true;
+      }
+
+    }
+
+    // this.apiPaths = apiPaths( this, {});
+    // this.appPaths = appPaths( this, {});
+
+    if( this.isDaemon() ){
+      if( this._enableDaemond ){
+        for( const service_t of appConfig.daemonServices ){
+          console.ok(`   [daemon]: service: ${service_t} `);
+          this[ service_t ] = this.isUndefined(this[ service_t ])
+            ? await (require(`${appConfig.services_root}/${ service_t }`))( this, {} )
+            : this[ service_t ];
+
+        }        
+      }
+
+    }else{
+      this.express = await express(this, {});
+      this.server = server(this, {});      
+
+    }
+
+    await this._runPostBoot();
+
+    // this.logger.info('[Application]: _init: done');
+    // console.ok(` #Application:_init: done`);
+    this._listen();
+    this._createDaemon();
+
+  }
+
+  getSequelize(){ this.DB.sequelize; }
+  getModel( modelName ){
+    return this.DB.models && this.DB.models[ modelName ]
+      ? this.DB.models[ modelName ] 
+      : {};
+  }
+
+  isModel( mModel ){
+    return this.isObject(mModel) && this.isPosNumber(mModel.id);
+  }
+
+  // translate => (i18n)
+  t(/*key, lang*/){ return this.i18n.t( ...arguments ); }
+
+  getServerTz(){ return this.DT.moment.tz.guess(); }
+  getDateFormat( withTZ=false ){ return withTZ ? this.DT.moment.tzFormat : this.DT.moment.defaultFormat; }
+  getISODate( withTZ=false ){ return this.DT.moment().format( this.getDateFormat( withTZ ) ); /* .split('+')[0].split('.')[0].trim();*/ }
+  getServerTime(){ return this.getISODate(); }
+  getHumanDate(){ return this.getISODate().split('T')[0]; }
+  getHumanDatetime(){ return this.getISODate().replace('T','-'); }
+
+  toHumanDate(datetime_t, withTZ=false){ 
+    return this.DT.isValidDatetime(datetime_t)
+      ? this.DT.moment( datetime_t ).format(this.DT.moment.humanDateFormat)
+      : 'no date';
+  }
+
+  toHumanDatetime(datetime_t, withTZ=false){
+    return this.DT.isValidDatetime(datetime_t)
+      ? this.DT.moment( datetime_t ).format(this.DT.moment.humanDatetimeFormat)
+      : 'no date-time';
+
+  }
+
+  getDetailedDate({ leadingZero=false }={}){
+    const date_t = new Date();
+    const dateObj = {
+      D: date_t.getDate(), // 27th day of the month
+      M: date_t.getMonth() +1, // (0 - 11) +1
+      Y: date_t.getFullYear(), // 2021
+      y: date_t.getFullYear() - 2000, // 21
+      h: date_t.getHours(), // 21
+      m: date_t.getMinutes(), // 28
+      s: date_t.getSeconds(),
+      weekDay: date_t.getDay(), // Sunday - Saturday : 0 - 6
+    };
+
+    if( leadingZero ){
+      dateObj.D = dateObj.D < 10 ? `0${dateObj.D}` : dateObj.D; 
+      dateObj.M = dateObj.M < 10 ? `0${dateObj.M}` : dateObj.M; 
+      // dateObj.Y = dateObj.Y < 10 ? `0${dateObj.Y}` : dateObj.Y; 
+      dateObj.h = dateObj.h < 10 ? `0${dateObj.h}` : dateObj.h; 
+      dateObj.m = dateObj.m < 10 ? `0${dateObj.m}` : dateObj.m; 
+      dateObj.s = dateObj.s < 10 ? `0${dateObj.s}` : dateObj.s; 
+    }
+
+    return dateObj;
+  }
+
+  getPublicServerInfo( res ){
+    const info = {
+      serverTime: this.getServerTime(),
+      duration: ( Date.now() - res.info.start ),
+    };
+
+    if( this.isEnv('dev') ){
+      // info.dev = {
+      //   android: {
+      //     apk: `${this.getEnv('PROTODOMAIN')}/inner-dev/app-debug.31-jan-2022.api.3dmadcat.ru.apk`,
+      //   }
+      // };
+    }
+
+    return info;
+  }
+
+  createForm( data=[] ){
+    const form = new FormData();
+    for( const mItem of data ){
+      if( this.isString(mItem.key) && !this.isUndefined(mItem.value) ){
+        form.append( mItem.key, mItem.value );
+      }
+    }
+    return form;
+  }
+
+  addFormFile( filePath ){
+    try{
+      if( !console.isFile(filePath) ){
+        console.warn(` #Application:addFormFile: filePath: [${filePath}] is not valid file`);
+        return false;
+      }
+      return fs.createReadStream( filePath );
+    }catch(e){
+      console.warn(` #Application:addFormFile: ${e.message}`);
+      return false;      
+    }
+  }
+
+  getBoolFromValue(val){
+    if( this.isPosNumber((+val)) ) return !!(+val);
+    if( this.isString(val) )
+      return val.trim().toLowerCase() === 'true';          
+    return (!!val);
+  }
+
+  getBooleanFromValue(val){ return this.getBoolFromValue(val); }
+
+  getNumber(val, { floor=false, abs=false, toFixed=false }={}){
+    if( !this.isNumber(+val) ) return 0;
+    val = (floor ? Math.floor( +val ) : (+val));
+    val = (abs ? Math.abs(val) : val);
+    return this.isPosNumber(toFixed) 
+      ? (+(val).toFixed(+toFixed)) 
+      : val;
+  }
+
+  getPosNumber(val, { floor=false, min=false, max=false, abs=false, toFixed=false }={}){
+    if( !this.isNumber(+val) ) return 0;
+    val = (floor ? Math.floor( +val ) : (+val));
+    val = (abs ? Math.abs(val) : val);
+
+    val = (this.isNumber(min) && (val < min))
+      ? min
+      : (this.isNumber(max) && (val > max))
+        ? max
+        : val;
+
+    return this.isPosNumber(toFixed) 
+      ? (+(+val).toFixed(+toFixed)) 
+      : val;
+
+  }
+
+  constrainNumber( amount, min, max ){
+    return (amount < min ? min : amount >= max ? max : amount)
+  }
+
+  toApiPath( name, values=[], withBase=false ){
+
+    if( !this.apiPaths.hasOwnProperty(name) ){
+      console.warn(` #Application:toApiPath: name: [${name}] is not valid name`);
+      return false;
+    }
+
+    let path = this.apiPaths[ name ];
+
+    if( values ){
+      if( typeof values === 'string' || typeof values === 'number' ){
+        path = path.replace('{0}', values || '');
+
+      }else if( Array.isArray(values) ){
+        for( let i=0; i<values.length; i++ )
+          path = path.replace(`{${i}}`, values[i] || '');
+      }
+    }
+
+    for( let i=0; i<5; i++ ) path = path.replace(`{${i}}`, '');
+    return withBase ? `${ PROTODOMAIN }${path}` : path; 
+
+  }
+
+  toAppPath( platform, name, values=[], withBase=false ){
+
+    // console.debug({ toAppPath: {platform, name, values, withBase} });
+
+    // if( !this.getModel('Session').getPlatforms()[ platform ] ){
+    //   console.warn(` #Application:toAppPath: platform: [${platform}] is not valid platform`);
+    //   return false;
+    // }
+
+    if( !this.appPaths.hasOwnProperty(platform) ){
+      // console.warn(` #Application:toAppPath: platform: [${platform}] is not valid`);
+      return '';
+    }
+
+    let mPath = this.appPaths[ platform ];
+
+    const paths = name.split('.')
+      .map((subPath)=>subPath.trim())
+      .filter((subPath)=>subPath)
+
+    if( !this.isArray(paths) || !paths.length ){
+      // console.warn(` #Application:toAppPath: empty path...`);
+      return '';
+    }
+
+    for( let path of paths ){
+      if( !mPath.hasOwnProperty(path) ){
+        // console.warn(` #Application:toAppPath: mPath => path: [${path}] is not valid`);
+        return '';
+      }
+      mPath = mPath[ path ];
+    }
+
+    if( !this.isString(mPath) ){
+      // console.warn(` #Application:toAppPath: mPath: is not a [string]`);
+      return '';
+    }
+
+    if( values ){
+      if( typeof values === 'string' || typeof values === 'number' ){
+        mPath = mPath.replace('{0}', values || '');
+
+      }else if( Array.isArray(values) ){
+        for( let i=0; i<values.length; i++ )
+          mPath = mPath.replace(`{${i}}`, values[i] || '');
+      }
+    }
+
+    for( let i=0; i<5; i++ ) mPath = mPath.replace(`{${i}}`, '');
+    return withBase ? `${ PROTODOMAIN }${mPath}` : mPath; 
+
+  }
+
+  // isAllowedEmailDomain( email ){
+  //   const domain = (''+email).split('@')[0];
+  //   if( domain in ALLOWED_EMAIL_DOMAINS ){
+  //   }
+  //   return true;
+  // }
+
+  // getAllowedImagesExtentions(){
+  //   return ALLOWED_IMAGES_EXTENTIONS;
+  // }
+
+  // isAllowedImagesExtentions( extention ){
+  //   if( !extention ) return false;
+  //   extention = extention.trim().toLowerCase();
+  //   return ALLOWED_IMAGES_EXTENTIONS.includes( extention );
+  // }
+
+  getPublicPath( name, withBase=true ){
+    if( !this.upload.path.hasOwnProperty(name) ) return false;
+    const path = this.upload.path[ name ];
+    // return withBase ? `${ PROTODOMAIN }${path}` : path; 
+    // return withBase ? `${PROTOCOL}://${DOMAIN}${path}` : path; 
+    // return withBase ? `${WEBSITE}${path}` : path; 
+    return withBase ? `${PROTOCOL}://${SUB_DOMAIN}.${DOMAIN}${path}` : path; 
+  }
+
+  isSupportedUploadTagName( name ){
+    return this.isString( name )
+      ? this.upload.config.supportedTypes.hasOwnProperty(name)
+      : false;
+  }
+
+  getUrlOrCreateByPath(fileNameOrFileUrl, publicPathKey, withBase=true){
+
+    fileNameOrFileUrl = (fileNameOrFileUrl || '').toString().trim();
+    fileNameOrFileUrl = fileNameOrFileUrl === 'n/a' ? '' : fileNameOrFileUrl;
+
+    if( this.tools.isUrl(fileNameOrFileUrl) )
+      return fileNameOrFileUrl;
+
+    const pubPath = this.getPublicPath( publicPathKey, withBase );
+    if( !pubPath || !fileNameOrFileUrl ){
+      // console.warn(` #Application:getUrlOrCreateByPath: (fileNameOrFileUrl: [${fileNameOrFileUrl}], publicPathKey: [${publicPathKey}])`);
+      // console.warn({ fileNameOrFileUrl, publicPathKey, withBase });
+      return '';
+    }
+
+    return `${pubPath}/${ fileNameOrFileUrl }`;
+  }
+
+  copyUploadedFileByName(name, from, to){
+
+    try{
+
+      if( !this.isString(name) ){
+        console.warn(` #App:copyUploadedFileByName: [name] must be valid <string>`);
+        return false;      
+      }
+
+      const nameTest = name.trim().split('/');
+
+      if( nameTest.length >= 3 || this.tools.isUrl(name) ){
+        name = nameTest.pop().trim();
+      }
+
+      from = this.getPublicPath( from, false );
+      to = this.getPublicPath( to, false );
+
+      if( !from || !to ){
+        console.warn(` #App:copyUploadedFileByName: [from | to] is not valid`);
+        return false;
+      }
+
+      from = `${this.public_html}${from}/${name}`;
+      to = `${this.public_html}${to}/${name}`;
+
+      if( console.isFile(to) ){
+        console.log(` #App:copyUploadedFileByName: file already exists`);
+        return name;
+      }
+
+      console.shell.sync(` cp -f ${from} ${to}`);
+      console.ok(` #App:copyUploadedFileByName: file copied ...`);
+      return name;
+
+    }catch(e){
+      console.error(` #App:copyUploadedFileByName: ${e.message}`);
+      return false;
+    }
+
+  }
+
+  isEnv( env ){
+    return this.isString(env) && env === this.getEnv('NODE_ENV');
+  }
+
+  getDictByName( name ){
+    if( console.isFile(`${this.dicts_root}/${name}.js`) )
+      return require(`${this.dicts_root}/${name}.js`);
+    return [];
+  }
+
+  // HTTP-API
+  async _finalizeRequest( res, data={} ){
+
+    try{
+
+      if( res && typeof res.json !== 'undefined' ){
+        data.server = this.getPublicServerInfo( res );
+        let status = 200;
+        // console.json({ _finalizeRequest: data});
+        if( data ){
+          status = (data.success === true || data.success === 200) 
+            ? 200 
+            : this.isPosNumber(data.success) ? data.success : 500;
+        }
+
+        data.success = data.success === true || data.success === 200 ? true : false; 
+
+        this.logger.debug(` ${res.info.method}: [${status}]: ${res.info.path} => ${res.info.ip}, message: [${data.message}]`);
+
+        if( !data.success )
+          console.warn(` ${status}: ${res.info.method}: [${res.info.ip}] => [${res.info.path}]: ${data.message}`);
+
+        await res.header('Content-Type', 'application/json');
+        await res.status( status ).json( data );
+      }
+
+    }catch(e){
+      console.warn(` #Application:_finalizeRequest: ${e.message}`);
+      this.logger.fatal(` #Application:_finalizeRequest`, e.message );
+    }
+
+  }
+
+  async json( res, success, message='OK', data="" ){
+
+    if( typeof success === 'object' ){
+      message = success.message;
+      data = success.data || "";
+      success = success.success;
+    }
+
+    // const TE = console.TE(res._res_uuid);
+    // console.debug(` TE: ${TE} `);
+
+    await this._finalizeRequest( res, {
+      success: ((!success) ? 417 : success), 
+      message: this.t( message, res.lang ),
+      data
+    });
+
+  }
+
+  html( res, html ){
+    if( !res || !this.isFunction(res.header) ){
+      console.error(`#Application:html: ${this.t(['response','object','is-not','valid'])}`);
+      return false;
+    }
+
+    try{
+      res.header('Content-Type', 'text/html');
+      res.status(200).end( html );
+      return true;
+    }catch(e){
+      console.error(`#Application:html: ${e.message}`);
+    }
+
+    return false;
+  }
+
+  async renderUI( res, type_t, data ){
+
+    const result = {success: false, message: [], data: {}};
+
+    if( !res || !this.isFunction(res.header) ){
+      result.message = ['response','object','is-not','valid'];
+      console.error({renderUI: {result}});
+      return result;
+    }
+
+    if( !this.isObject(this.UI) || !this.isFunction(this.UI.renderTemplate) ){
+      result.message = ['ui','render','service','is-not','enbled'];
+      console.error({renderUI: {result}});
+      await this.json( res, result.status, result.message );
+      return result;
+    }
+
+    const templateRes = await this.UI.renderTemplate( type_t, data );
+    if( templateRes.success ){
+      this.html( res, templateRes.data );
+      return templateRes;
+    }
+
+    this.json( res, templateRes );
+    return templateRes;
+
+  }
+
+  async onRouteError( req, res, exception, messages=[] ){
+
+    const message = this.isString(exception.message) ? exception.message : '';
+    const stack = this.isString(exception.stack) ? exception.stack.split('\n').map((line)=>line.trim()).splice(0,3) : [];
+
+    console.warn(`   ip: [${res.info.ip}], [${res.info.method}], path: [${res.info.path}] => [${message}]`);
+    this.logger.fatal( res.info, req.query, { message, stack } );
+
+    await this._finalizeRequest( res, { 
+      success: false, 
+      // message: this.t(['server-error'], req.lang), 
+      message: this.t('request-could-not-be-processed', req.lang), 
+      // data: res.info, 
+      data: "e"
+    });
+
+    if( this.Telegram && this.isFunction(this.Telegram.onError) ){
+      this.Telegram.onError(
+        `${res.info.path}\n${res.info.ip}\n${exception.message}\n`
+      );      
+    }
+
+  }
+
+  getAppName(){ return APP_NAME; }
+
+  getSystemInfo(){
+    return {
+      cpus: os.cpus(),
+      totalmem: os.totalmem(), // => int
+      freemem: os.freemem(), // => int
+      arch: os.arch(), // => x64
+      hostname: os.hostname(), // 
+      version: os.version(), //
+      loadavg: os.loadavg(), // => [0,0,0] => 1, 5, and 15 minute load averages.
+      networkInterfaces: os.networkInterfaces(), //
+      platform: os.platform(), // => linux
+      uptime: os.uptime(), // => int
+    };    
+  }
+
+  isDaemon(){ return (!!this._isDaemon); }
+
+  async _createDaemon(){
+
+    const self = this;
+    if( self.isDaemon() ) return false;
+
+    if( !this._enableDaemond ){
+      console.debug(` #[daemon]: disabled ...`);
+      return false;
+    }
+
+    await console.sleep(2000);
+
+    try{
+
+      self._daemon = fork(self._daemonPath, ['APP_DAEMON'], {});
+
+      self._daemon.on('error', (err) => {
+        console.log(` #[daemon]: ${ self.isObject(err) && self.isString(err.message) ? err.message : err }`);
+      });
+
+      console.ok(` #Application: _createDaemon: OK`);
+
+    }catch(e){
+      console.error(` #Application: _createDaemon: ${e.message}`);
+    }
+
+  }
+
+  _listen(){
+
+    const self = this;
+
+    if( self.isDaemon() )
+      return console.debug(` listen: is-daemon: [true] aborting ...`);
+
+    const appConfig = this.getConfig(false);
+
+    const host = self.host;
+    const port = self.port;
+    const protocol = self.protocol;
+    self.server.listen( port, host, async(a,b)=>{
+      self.logger.info(`[Application]: web-server: ${protocol}://${host}:${port} => ready`);
+      console.ok(` #Application: web-server: `);
+      console.ok(`   ${protocol}://${host}:${port} (>>proxy) => ready`);
+      console.ok(`   ${protocol}://${self.getEnv('SUB_DOMAIN')}.${self.getEnv('DOMAIN')} (proxy<<) => ready`);
+
+      console.ok(` #Application: params: `);
+      console.info(`   is-master           : ${ self.isNodeOfTypeEnabled('master') ? console.G('Yes') : console.R('No')}`);
+      console.info(`   is-api              : ${ self.isNodeOfTypeEnabled('api') ? console.G('Yes') : console.R('No') }`);
+      console.info(`   use-strict-path     : ${ appConfig.useStrictPath ? console.G('Yes') : console.R('No') }`);
+      console.info(`   run-post-boot-tasks : ${ appConfig.runPostBootTasks ? console.G('Yes') : console.R('No') }`);
+      console.info(`   use-middlewares     : ${ appConfig.useMiddlewares ? console.G('Yes') : console.R('No') }`);
+      console.info(`   use-auto-router     : ${ appConfig.useAutoRouter ? console.G('Yes') : console.R('No') }`);
+
+      self.emit('web-server-is-ready');
+      // if( !self.isEnv('prod') ){
+      //   if( self.isEnv('rem') ){
+      //     // await self._initVirtualConsole();
+      //   }
+      // }
+
+      // if( self.isEnv('dev') )
+      self.socket = require('./socket-server')( this, appConfig.socketServer );
+
+      console.ok(` #Application: #NODE: ${self.getNodeUID()} => ready`);
+      self.emit('app-is-ready');
+
+    });
+
+  }
+
+  async _runPostBoot(){
+    try{
+
+      if( !this.getConfig(false).runPostBootTasks ) return true;
+
+      const tasksRoot = `${this.app_root}/post-boot/tasks`;
+      const taskPattern = '.task.js'; 
+
+      const tasks = console.listDir( tasksRoot )
+        .filter((t)=>t.endsWith(taskPattern))
+        .sort(( a, b )=>{
+          return (+(a.split('.')[0])) < (+(b.split('.')[0])) ? -1 : +1;
+        });
+
+      // console.json({tasks});
+
+      if( !this.isArray(tasks) || tasks.length <= 0 ) return true;
+      console.line();
+      console.log(`   [post-boot]: start ...`);
+
+      for( const taskFile of tasks ){
+        const taskName = taskFile.replace(taskPattern, '').trim();
+
+        if( !console.isFile(`${tasksRoot}/${taskFile}`) ){
+          console.debug(`     task: [${taskName}] not valid task and/or name. aborting...`);
+          continue;
+        }
+
+        console.debug(`   [post-boot]: run: ${taskName}`);
+        const taskRes = await require(`${tasksRoot}/${taskName}${taskPattern}`)( this, {}, taskName );
+        console[ taskRes ? 'ok' : 'error' ](`     task: [${taskName}] => [${ taskRes.toString() }] `);
+      }
+
+      console.ok(`   [post-boot]: done`);
+      console.log('');
+
+    }catch(e){
+      console.warn(` #Application:_runPostBoot: ${e.message}`);
+      return false;
+    }
+  }
+
+  on(event, callback){
+    try{
+
+      event = (event.toString().trim());
+
+      if( !event || typeof callback !== 'function' )
+        return false;
+
+      if( !this._event_subs[ event ] )
+        this._event_subs[ event ] = [];
+
+      this._event_subs[ event ].push( callback );
+      return true;
+
+    }catch(e){
+      console.warn(` #Application:on: event: [${event}]: ${e.message}`);
+      return false;
+    }
+
+  }
+
+  emit(event, data={}, params={}){
+    try{
+
+      event = (event.toString().trim());
+
+      if( !event ) return false;
+
+      if( !this._event_subs[ event ] ) return false;
+
+      for( const callback of this._event_subs[ event ] ){
+
+          try{
+
+            if( typeof callback !== 'function' )
+              continue;
+
+            callback( data, params );
+
+          }catch(e){
+            console.warn(` #Application:emit: [0]: [${event}]: ${e.message}`)
+          }
+
+      }
+      return true;
+
+    }catch(e){
+      console.warn(` #Application:emit: [1]: event: [${event}]: ${e.message}`);
+      return false;
+    }
+
+  }
+
+  parseJson( json_raw_t ){
+    try{
+      return JSON.parse(json_raw_t);
+    }catch(e){
+      console.warn(` #Application:parseJson: ${e.message}`);
+      return false;
+    }
+  }
+
+  createSystemEmail( name=false, length=14 ){
+    try{
+      const hexToken = this.BCrypt.randomSecureToken(length);
+      return `${ name || hexToken }@${this.domain}`;
+    }catch(e){
+      console.error(` #Application:createSystemEmail: ${e.message}`);
+      return false;
+    }
+  }
+
+  isString( value ){ return typeof value === 'string'; }
+  isArray( value ){ return Array.isArray(value); }
+  isNumber( value ){ return typeof value === 'number' && !this.isNaN( value ) && (Math.abs(value) !== Infinity); }
+  isObject( value ){ return typeof value === 'object' && !this.isNull(value) && !this.isArray(value); }
+  isNull( value ){ return typeof value === 'object' && value === null; }
+  isNaN( value ){ return typeof value === 'number' && isNaN(value); }
+  isUndefined( value ){ return typeof value === 'undefined'; }
+  isBool( value ){ return typeof value === 'boolean'; }
+  isBoolean( value ){ return this.isBool(value); }
+
+  isPosNumber( value ){ return this.isNumber(value) && value > 0; }
+  isNegNumber( value ){ return this.isNumber(value) && value > 0; }
+  isFunction( value ){ return typeof value === 'function'; }
+
+  isDateString( value ){
+    try{
+      if( !this.isString(value) ) return false;
+      return !!( (new Date(value)).getTime() );
+    }catch(e){
+      return false;
+    }
+  }
+
+  getEnv( key, toObject=false ){
+    try{
+      if( !this.isString( process.env[ key ] ) ) return false;
+      return toObject ? JSON.parse(process.env[ key ]) : process.env[ key ];
+    }catch(e){
+      console.error(` #Application:getEnv: ${e.message} => key: [${key}], toObject: [${toObject}]`);
+      return false;
+    }
+  }
+
+  getEnvAsBool( key ){
+    try{
+      if( !this.isString( process.env[ key ] ) ) return false;
+      return this.getBoolFromValue( process.env[ key ] );
+    }catch(e){
+      console.error(` #Application:getEnvAsBool: ${e.message} => key: [${key}]`);
+      return false;
+    }
+  }
+
+  getEnvAsInt( key ){
+    try{
+      if( !this.isString( process.env[ key ] ) ) return false;
+      return this.getNumber( process.env[ key ], {floor:true,abs:false});
+    }catch(e){
+      console.error(` #Application:getEnvAsInt: ${e.message} => key: [${key}]`);
+      return false;
+    }
+  }
+
+  getEnvAsFloat( key ){
+    try{
+      if( !this.isString( process.env[ key ] ) ) return false;
+      return this.getNumber( process.env[ key ], {floor:false,abs:false});
+    }catch(e){
+      console.error(` #Application:getEnvAsFloat: ${e.message} => key: [${key}]`);
+      return false;
+    }
+  }
+
+  toJSON( mObject={}, defaultValue='{}' ){
+    try{
+
+      const json_t = this.isObject(mObject)
+        ? JSON.stringify(mObject)
+        : this.isString(mObject)
+          ? mObject
+          : defaultValue; // 'mObject is not valid <object> nor <string>'
+
+      return json_t;
+
+    }catch(e){
+      console.error(` #Application:toJSON: ${e.message}`);
+      return defaultValue;
+    }
+  }
+
+  cleanString( val, toLowerCase=false ){
+    if( !this.isString(val) ) return false;
+    val = val.replace(/["'\{\}\[\]\?\\\/+-\.]/g, '').trim();
+    return toLowerCase ? val.toLowerCase() : val;
+  }
+
+}

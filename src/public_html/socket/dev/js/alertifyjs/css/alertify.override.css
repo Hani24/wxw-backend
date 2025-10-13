@@ -1,0 +1,129 @@
+/* .alertify .ajs-header{} */
+.ajs-header{
+  background-color: #eee !important;
+
+  /*
+  padding: 0; margin: 0; height: 100%; width: 100%;
+  background-image: url('/imgs/bgs/epic-war-backgrounds-1920x1080-tablet.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-color: #000;
+  background-position: center center;
+  background-attachment: fixed;
+  */
+
+}
+
+/*
+padding: 0; margin: 0; height: 100%; width: 100%;
+background-image: url('/imgs/bgs/epic-war-backgrounds-1920x1080-tablet.jpg');
+background-size: cover; background-repeat: no-repeat;
+background-color: #000;
+background-position: center center;
+background-attachment: fixed;
+*/
+
+.ajs-message{ box-shadow: 3px 3px 4px #777; cursor: pointer; background: #fff; }
+.ajs-message.ajs-error.ajs-visible{ background: #e53935 !important; color: #fff !important;  }
+.ajs-message.ajs-success.ajs-visible{ background: #8bc34a !important; color: #fff !important;  }
+.ajs-message.ajs-warning.ajs-visible{ background: #ff9800 !important; color: #fff !important;  }
+
+.ajs-dialog {
+  width: 96% !important; max-width: 900px !important; overflow: hidden;
+}
+
+.alertify-notifier.ajs-right { right: 4px; }
+.alertify-notifier.ajs-top { right: 4px; }
+
+/* [TOP-RIGHT: main wrapper]; */
+.alertify-notifier.ajs-top.ajs-right{
+  margin: 0; padding: 0; width: 97%;  width: 100%; max-width: 400px;
+}
+
+.alertify-notifier.ajs-message {
+  position: absolute; min-width: 0; margin: 0;
+}
+
+/* /[TOP-RIGHT: main wrapper]; */
+.alertify-notifier.ajs-right .ajs-message.ajs-visible {
+  right: 0; float: right; min-height: 64px; clear: both; margin-top: 0; 
+  margin-bottom: 10px; margin-right: 2%; width: 97%;
+}
+
+.alertify-notifier .ajs-message.ajs-visible{
+  -webkit-transition-duration: .7s !important;
+  transition-duration: .7s !important;
+
+  /*
+  -webkit-transition-duration: .5s;
+  transition-duration: .5s;
+  -webkit-transition-timing-function: cubic-bezier(.175,.885,.32,1.275);
+  transition-timing-function: cubic-bezier(.175,.885,.32,1.275);
+  opacity: 1;
+  */
+
+}
+
+/*
+
+# RED:
+  100: "#ffcdd2"
+  200: "#ef9a9a"
+  300: "#e57373"
+  400: "#ef5350"
+  500: "#f44336"
+  600: "#e53935"
+  700: "#d32f2f"
+  800: "#c62828"
+  900: "#b71c1c"
+
+# GREEN:
+
+  100: "#c8e6c9"
+  200: "#a5d6a7"
+  300: "#81c784"
+  400: "#66bb6a"
+  500: "#4caf50"
+  600: "#43a047"
+  700: "#388e3c"
+  800: "#2e7d32"
+  900: "#1b5e20"
+
+
+# L-GREEN:
+
+  100: "#dcedc8"
+  200: "#c5e1a5"
+  300: "#aed581"
+  400: "#9ccc65"
+  500: "#8bc34a"
+  600: "#7cb342"
+  700: "#689f38"
+  800: "#558b2f"
+  900: "#33691e"
+
+
+# ORANGE:
+  100: "#ffe0b2"
+  200: "#ffcc80"
+  300: "#ffb74d"
+  400: "#ffa726"
+  500: "#ff9800"
+  600: "#fb8c00"
+  700: "#f57c00"
+  800: "#ef6c00"
+  900: "#e65100"
+
+# DEEP-ORANGE:
+
+  100: "#ffccbc"
+  200: "#ffab91"
+  300: "#ff8a65"
+  400: "#ff7043"
+  500: "#ff5722"
+  600: "#f4511e"
+  700: "#e64a19"
+  800: "#d84315"
+  900: "#bf360c"
+
+*/

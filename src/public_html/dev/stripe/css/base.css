@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css?family=Raleway&display=swap');
+
+:root {
+  --light-grey: #F6F9FC;
+  --dark-terminal-color: #0A2540;
+  --accent-color: #635BFF;
+  --radius: 3px;
+}
+
+html, body {
+  padding: 0; margin: 0;
+  font-family: 'Raleway';
+  font-size: 14px;
+  color: var(--dark-terminal-color);
+  background: #f2f2f2;
+}
+
+main {
+  max-width: 720px; display: block; margin: 20px auto; box-sizing: border-box;
+  padding: 20px; text-align: center;
+}
+
+form > * {
+  margin: 10px 0;
+}
+
+button {
+  background-color: var(--accent-color);
+}
+
+button {
+  background: var(--accent-color);
+  border-radius: var(--radius);
+  color: white;
+  border: 0;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block; 
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+button:hover {
+  filter: contrast(115%);
+}
+button:active {
+  transform: translateY(0px) scale(0.98);
+  filter: brightness(0.9);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: none;
+}
+
+input, select {
+  display: block;
+  font-size: 1.1em;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+label {
+  display: block;
+}
+
+a {
+  color: var(--accent-color);
+  font-weight: 900;
+}
+
+small {
+  font-size: .6em;
+}
+
+fieldset, input, select {
+  border: 1px solid #efefef;
+}
+
+#payment-form {
+  border: #F6F9FC solid 1px;
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 30px 50px -20px rgb(50 50 93 / 25%), 0 30px 60px -30px rgb(0 0 0 / 30%);
+}
+
+.payment-row{
+  background: #fff; display: block; box-sizing: border-box; padding: 10px;
+  margin-bottom: 20px;
+
+}
+
+table {
+  width: 100%; border: solid 1px #ccc; text-align: left;
+}
+
+table tr:nth-child(2) {
+  background: #f5f5f5;
+}
+
+table th, table td {
+  padding: 5px 10px;
+}

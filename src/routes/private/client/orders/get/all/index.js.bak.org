@@ -1,0 +1,163 @@
+const express = require('express');
+const router = express.Router();
+
+// /private/client/orders/get/all
+
+module.exports = function(App, RPath){
+
+  router.use('', async(req, res)=>{
+
+    try{
+
+      const mUser = await req.user;
+      const mClient = await req.client;
+      const data = req.getPost();
+
+      const {offset, limit, order, by} = req.getPagination({});
+      const orderBy = App.getModel('Order').getOrderBy(by);
+      const statuses = App.getModel('Order').getStatuses();
+
+      const mOrders = await App.getModel('Order').findAndCountAll({
+        where: {
+          clientId: mClient.id,
+          // status: { [ App.DB.Op.not ]: statuses.created },
+          status: {
+            [ App.DB.Op.or ]: [
+              statuses['processing'],
+              // statuses['canceled'],
+              statuses['delivered'],
+              statuses['refunded'],
+            ]
+          },
+          // [ App.DB.Op.or ]: [
+          //   // {
+          //   //   // only (canceled) but if (isPaid && isRefunded)
+          //   //   [ App.DB.Op.and ]: [
+          //   //     App.DB.where(App.DB.col('Order.status'), statuses['canceled'] ),
+          //   //     App.DB.where(App.DB.col('Order.isPaid'), true ),
+          //   //     App.DB.where(App.DB.col('Order.isRefunded'), true ),
+          //   //   ]
+          //   // },
+          //   {
+          //     [ App.DB.Op.or ]: [
+          //       App.DB.where(App.DB.col('Order.status'), statuses['processing'] ),
+          //       App.DB.where(App.DB.col('Order.status'), statuses['delivered'] ),
+          //       App.DB.where(App.DB.col('Order.status'), statuses['refunded'] ),
+          //     ]
+          //   },
+          // ],
+        },
+        distinct: true,
+        attributes: [
+          'id','status','totalItems','totalPrice','finalPrice','deliveryPrice',
+          'discountAmount','discountCode',
+          'isPaid', // 'paidAt',
+          'isRefunded', // 'refundedAt',
+          'isOrderRatedByClient', // 'orderRatedByClientAt',
+          'isPaymentRequested', // 'paymentRequestedAt',
+          'isCourierRatedByClient', 'courierRating', // 'courierRatedByClientAt',
+          'isClientActionRequired', // 'clientActionRequiredAt',
+          'isClientActionExecuted', // 'clientActionExecutedAt',
+          'isDeliveredByCourier', // 'celiveredByCourierAt',
+          'isCanceledByClient', // 'canceledByClient',
+          'allSuppliersHaveConfirmedAt',
+          'expectedDeliveryTime',
+          ['createdAt','orderTime'],
+          'updatedAt',
+          'isValidChecksum','checksum',
+          ...App.getModel('Order').getChecksumKeys(),
+        ],
+        include: [
+          {
+            model: App.getModel('OrderDeliveryTime'),
+            required: true,
+            attributes: [
+              'id','deliveryDay','deliveryHour','deliveryTimeValue','deliveryTimeType'
+            ],
+          },
+          {
+            model: App.getModel('OrderDeliveryAddress'),
+            required: true,
+            attributes: ['id'],
+            include: [{
+              model: App.getModel('DeliveryAddress'),
+              required: true,
+              attributes: ['id','stateId','city','street','apartment',],
+              include: [{
+                model: App.getModel('State'),
+                attributes: [
+                  'id','name','code'
+                ],
+              }]
+            }]
+          },
+          {
+            model: App.getModel('OrderPaymentType'),
+            required: true,
+            attributes: [
+              'id','type'
+            ],
+            include: [{
+              model: App.getModel('PaymentCard'),
+              attributes: [
+                'id','encCardNumber',
+              ],
+            }]
+          },
+        ],
+        order: [[ orderBy, order ]],
+        offset: offset,
+        limit: limit,
+      });
+
+      for( const mOrder of mOrders.rows ){
+
+        // mOrder.dataValues.status = 'processing';
+
+        mOrder.dataValues.deliveryTime = App.getModel('OrderDeliveryTime')
+          .getHumanTimeFromObject( mOrder.OrderDeliveryTime );
+
+        const mDeliveryAddress = mOrder.OrderDeliveryAddress.DeliveryAddress;
+        mOrder.dataValues.stateId = mDeliveryAddress.State.id;
+        mOrder.dataValues.deliveryAddress = `${mDeliveryAddress.State.name}, ${mDeliveryAddress.city}, ${mDeliveryAddress.street}`
+          +(
+            ( !! mDeliveryAddress.apartment) 
+              ? ` / ${mDeliveryAddress.apartment}`
+              : ''
+          );
+
+        if( mOrder.OrderPaymentType.type !== App.getModel('OrderPaymentType').getTypes().Card ){
+          mOrder.dataValues.paymentType = mOrder.OrderPaymentType.type;          
+        }else{
+
+          const decCardNumberRes = App.RSA.decrypt(mOrder.OrderPaymentType.PaymentCard.encCardNumber);
+          if( !decCardNumberRes.success ){
+            mOrder.dataValues.paymentType = `n/a`;
+          }else{
+            const lastDigits = decCardNumberRes.data.substr( decCardNumberRes.data.length -4 );            
+            mOrder.dataValues.paymentType = `Card: **** ${lastDigits}`;
+          }
+
+        }
+
+        delete mOrder.dataValues.OrderPaymentType;
+        delete mOrder.dataValues.OrderDeliveryTime;
+        delete mOrder.dataValues.OrderDeliveryAddress;
+
+      }
+
+      App.json( res, true, App.t('success', res.lang), mOrders);
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: '', autoDoc:{} };
+
+};
+
+

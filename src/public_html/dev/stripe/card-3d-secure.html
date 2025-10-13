@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Card 3D-Secure</title>
+
+    <link rel="stylesheet" href="./css/base.css" />
+    <script src="https://js.stripe.com/v3/"></script>
+
+    <script src="./utils.js" defer></script>
+    <script src="./card-3d-secure.js" defer></script>
+  </head>
+  <body>
+    <main>
+
+      <div class="payment-row">
+        <h4>Card 3D-Secure (payment-intend info)</h4>
+
+        <label>Client-secret token</label><br/>
+        <input 
+          id="client-secret-input"
+          placeholder="pi_3KRa35LkgFoZ4U2T1yWZHkBN_secret_Jp7wE9KVSpm8T2UIyXgvxUMur"
+        />
+        <button id="client-secret-button">Get payment info</button>
+      </div>
+
+      <div class="payment-row">
+
+        <h4>Card 3D-Secure (confirm payment-intend)</h4>
+
+        <div id="payment-info" class="payment-row">
+          <table id="payment-info-table">
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody id="payment-info-table-tbody">
+            </tbody>
+          </table>
+        </div>
+  
+        <button id="confirm-payment-button" disabled="true">Confirm Payment</button>
+  
+      </div>
+
+    </main>
+  </body>
+</html>

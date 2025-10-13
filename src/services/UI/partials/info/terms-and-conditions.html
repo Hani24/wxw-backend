@@ -1,0 +1,29 @@
+<div class="common-info-and-text__pp-wrapper">
+  <p> {appName} - <strong id="sectionTitle"></strong> </p>
+</div>
+
+<div id="data"></div>
+
+<script type="text/javascript">
+  const {mTermsAndConditions} = {data};
+
+  if( typeof mTermsAndConditions === 'object' && typeof mTermsAndConditions.sectionTitle === 'string' ){
+
+    document.getElementById('sectionTitle').innerHTML = mTermsAndConditions.sectionTitle;
+    document.getElementById('data').innerHTML = 
+      mTermsAndConditions.TermsAndConditionsItems.map((mItem)=>{
+        return `
+          <div class="common-info-and-text__pp-wrapper">
+            <h4 class="common-info-and-text__pp-title">${mItem.itemTitle}</h4>
+            <div class="common-info-and-text__pp-body">${mItem.itemText}</div>
+          </div>
+        `;
+      })
+        .join('\n\n');
+
+  }
+
+  window.addEventListener('load',()=>{
+    // console.log(data);
+  });
+</script>

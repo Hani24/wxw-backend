@@ -1,0 +1,44 @@
+// https://firebase.google.com/docs/auth/admin/verify-id-tokens#web
+const admin = require("firebase-admin");
+
+const ITEMS_ROOT = `${__dirname}/items`;
+const ITEMS_EXT = `.item.js`;
+const FIREBASE_CONFIG = process.env.FIREBASE_CONFIG || '';
+
+module.exports = (App, params={})=>{
+
+  console.line();
+  console.ok(` #firebase:`);
+
+  const items_t = {};
+  const serviceAccount = require(`${App.root}/${ FIREBASE_CONFIG }`);
+console.log('FIREBASE_CONFIG: ', FIREBASE_CONFIG);
+console.log('serviceAccount', serviceAccount);
+ console.log('Firebase Project ID:', serviceAccount.project_id);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+
+  items_t['admin'] = admin;
+
+  const items = console.listDir(ITEMS_ROOT)
+    .filter((item)=>item.endsWith(ITEMS_EXT));
+
+  for( const item of items ){
+    const itemName = item.replace(ITEMS_EXT, '').trim();
+    try{
+      if( itemName === 'admin' ){
+        console.error(`   ${console.B(itemName)} => ${console.R(`sub-module can't name [admin]`)}`);
+        continue;
+      }
+      const mFunc = require(`${ITEMS_ROOT}/${item}`)( App, itemName, params );
+      console.ok(`   ${console.B(itemName)} => ${console.G('inited ...')}`);
+      items_t[ itemName ] = mFunc;
+    }catch(e){
+      console.error(`   ${itemName} => ${e.message}`);
+    }
+  }
+
+  return items_t;
+
+}

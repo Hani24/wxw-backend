@@ -1,0 +1,132 @@
+const express = require('express');
+const router = express.Router();
+
+// {
+//   "id": "required: <number>: Ref. Restaurant.id"
+// }
+
+// /private/admin/restaurants/delete/by/id/:id
+
+module.exports = function(App, RPath){
+
+  router.use('', async(req, res)=>{
+
+    try{
+
+      const mUser = await req.user;
+      // const mRestaurant = await req.restaurant;
+
+      const roles = App.getModel('User').getRoles();
+      const id = App.getPosNumber(req.getCommonDataInt('id', null));
+
+     if( App.isNull(id) )
+        return App.json( res, 417, App.t(['restaurant','id','is-required'], req.lang) );
+
+      const mRestaurant = await App.getModel('Restaurant').findOne({
+        where: {
+          id,
+          isDeleted: false,
+          // isRestricted: false,
+        },
+        distinct: true,
+        attributes: [
+          'id',
+          'isVerified', 'verifiedAt',
+          'isRestricted', 'restrictedAt',
+        ],
+        include: [{
+          required: true,
+          model: App.getModel('User'),
+          where: {
+            role: roles.restaurant,
+            isDeleted: false,
+            // isRestricted: false,
+          },
+          attributes: [
+            'id','email','phone','firstName','lastName'
+          ],
+        }],
+      });
+
+      if( !App.isObject(mRestaurant) || !App.isPosNumber(mRestaurant.id) )
+        return App.json( res, 404, App.t(['restaurant','not-found','and','/','or','already','deleted'], req.lang) );
+
+      // if( mRestaurant.isVerified )
+      //   return App.json( res, 417, App.t(['restaurant','already','verified'], req.lang) );
+
+      if( mRestaurant.isRestricted )
+        return App.json( res, 417, App.t(['restaurant','is-restricted','already'], req.lang) );
+
+      // if( mRestaurant.User.isRestricted )
+      //   return App.json( res, 417, App.t(['restaurant','owner','is-restricted'], req.lang) );
+
+      const tx = await App.DB.sequelize.transaction( App.DB.getTxOptions() );
+
+      try{
+
+        const updateRestaurant = await mRestaurant.update({
+          isDeleted: true,
+          deletedAt: App.getISODate(),
+          isRestricted: true,
+          restrictedAt: App.getISODate(),
+        }, {transaction: tx});
+
+        if( !App.isObject(updateRestaurant) || !App.isPosNumber(updateRestaurant.id) ){
+          await tx.rollback();
+          return App.json( res, false, App.t(['failed-to','update','restaurant'], req.lang) );
+        }
+
+        const updateUser = await mRestaurant.User.update({
+          isDeleted: true,
+          deletedAt: App.getISODate(),
+          isRestricted: true,
+          restrictedAt: App.getISODate(),
+        }, {transaction: tx});
+
+        if( !App.isObject(updateUser) || !App.isPosNumber(updateUser.id) ){
+          await tx.rollback();
+          return App.json( res, false, App.t(['failed-to','update','user'], req.lang) );
+        }
+
+        await tx.commit();
+
+      }catch(e){
+        console.error(e.message);
+        await tx.rollback();
+        return App.json( res, false, App.t(['failed-to','delete','request'], req.lang) );
+      }
+
+      await App.json( res, true, App.t(['restaurant','successfully','deleted'], res.lang));
+
+      // [post-processing]
+
+      // not in use
+      // send email when restaurant has been deleted by super-admin 
+      // {
+      //   const deleteRequestEmeil = await App.Mailer.send({
+      //     to: mRestaurant.User.email,
+      //     subject: App.t(['restaurant-account-has-been-restricted'], req.lang),
+      //     data: await App.Mailer.createEmailTemplate('restaurant-account-has-been-restricted', { 
+      //       lang: 'en',
+      //       firstName: mRestaurant.User.firstName,
+      //       lastName: mRestaurant.User.lastName,
+      //     })
+      //   });
+      //   if( !deleteRequestEmeil.success ){
+      //     console.json({deleteRequestEmeil});
+      //   }
+      // }
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: '', autoDoc:{} };
+
+};
+
+

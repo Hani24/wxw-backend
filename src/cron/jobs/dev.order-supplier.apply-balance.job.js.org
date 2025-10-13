@@ -1,0 +1,116 @@
+module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
+
+  if( !App.isNodeOfTypeEnabled('master') ){
+    return false;
+  }
+
+  const Job = new BaseJob( App, {
+    name: jobName,
+    allowMultipleTasksAtTheSameTime: false, // do not wait for prev. instance to end.
+    isEnabled: true, // App.isEnv('dev'),
+    runOnce: false,
+    runAtStart: false, // true,
+    debug: config.debug, // App.isEnv('dev'),
+    runAt: [
+      { each: 20, type: 'seconds' },
+    ],
+  });
+
+  const statuses = App.getModel('Order').getStatuses();
+
+  Job.on('task', async(job, {each=0}={})=>{
+
+    // return;
+
+    const mOrder = await App.getModel('Order').findOne({
+      where: {
+        status: statuses.delivered,
+        isLocked: false,
+        lockedAt: null,
+        lockedByNuid: null,
+      },
+      attributes: [
+        'id','deliveredByCourierAt','isValidChecksum','checksum',
+        ...App.getModel('Order').getChecksumKeys(),
+      ],
+      // distinct: true,
+      include: [{
+        required: true,
+        model: App.getModel('OrderSupplier'),
+        attributes: [
+          'id','isAppliedToBalance','isValidChecksum','checksum',
+          ...App.getModel('OrderSupplier').getChecksumKeys(),
+        ],
+        where: {
+          isAppliedToBalance: false,
+        },
+      }],
+      order: [['deliveredByCourierAt','asc']],
+    });
+
+    if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) ){
+      if(job.isDebugOn()) job.debug(`#no orders found`);
+      return;
+    }
+
+    if( !mOrder.isValidChecksum )
+      return job.error('Security check error: order');
+
+    if( !App.isArray(mOrder.OrderSuppliers) || !mOrder.OrderSuppliers.length )
+      return job.error('no-suppliers');
+
+    for( const mOrderSupplier of mOrder.OrderSuppliers ){
+      if( !mOrderSupplier.isValidChecksum /*|| !mOrderSupplier.Restaurant.isValidChecksum*/ )
+        return job.error('Security check error: supplier');
+    }
+
+    // return job.error('break;');
+
+    const tx = await App.DB.sequelize.transaction( App.DB.getTxOptions({}) );
+    const mOrderSuppliers = await App.getModel('OrderSupplier').findAll({
+      where: {
+        orderId: mOrder.id,
+        isAppliedToBalance: false,
+        // isOrderReady: true,
+        // isTakenByCourier: true,
+      },
+      // attributes: ['id','orderId','restaurantId','totalPrice','totalItems','isAppliedToBalance','appliedToBalanceAt','isValidChecksum','createdAt'],
+      transaction: tx,
+      lock: tx.LOCK.UPDATE,
+      skipLocked: true,
+    });
+
+    // job.warn('sleep');
+    // await console.sleep(60*1000);
+
+    for( let mOrderSupplier of mOrderSuppliers ){
+
+      if( !mOrderSupplier.isValidChecksum){
+        job.error(`data is tampered: supplier: aborting ...`);
+        mOrderSupplier = await mOrderSupplier.update({
+          isAppliedToBalance: true, 
+          appliedToBalanceAt: App.getISODate(),
+          checksum: true,
+        });
+        continue;
+      }
+
+      const confirmRes = await App.getModel('OrderSupplier').applyOrderSupplierDataToBalance(mOrderSupplier, tx);
+      if(job.isDebugOn()) 
+        job[confirmRes.success?'ok':'error'](`#Order-Supplier: ${mOrderSupplier.id}: ${confirmRes.message}`);
+
+      if( !confirmRes.success ){
+        await tx.rollback();
+        return job.error(confirmRes.message);
+      }
+    }
+
+    await tx.commit();
+    if(job.isDebugOn()) job.ok(`done`);      
+
+  });
+
+  // Job.start();
+  return Job;
+
+}

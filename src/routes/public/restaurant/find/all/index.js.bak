@@ -1,0 +1,190 @@
+const express = require('express');
+const router = express.Router();
+
+// {
+//   "// NOTE": "optional filter",
+//   "type": "optional: ENUM: <string>[ stationary | mobile ]",
+//   "isOpen": "optional: <boolean>: set to: [true] to get only open Restaurants",
+//   "name": "",
+//   "searchNearByMe": "optional: [boolean]: default: false"
+// }
+
+// /public/restaurant/find/all?offset=0&limit=15&order=desc
+
+module.exports = function(App, RPath){
+
+  router.use('', async(req, res)=>{
+
+    try{
+
+      const mUser = await req.user;
+      const mClient = await req.client;
+
+      const data = req.getPost();
+      const {offset, limit, order, by} = req.getPagination({});
+      const orderBy = App.getModel('Restaurant').getOrderBy(by);
+
+      const restaurantTypes = App.getModel('Restaurant').getTypes({asArray: true});
+
+      const restaurantWhere = {
+        // isOpen: true,
+        isVerified: true,
+        isRestricted: false,
+        isOpeningHoursSet: true,
+        isKycCompleted: true,
+      };
+
+      const filters = {
+        searchNearByMe: App.getBooleanFromValue( data.searchNearByMe ),
+        isOpen: App.getBooleanFromValue( data.isOpen ) || null,
+        type: req.getCommonDataString('type', null ),
+        name: App.tools.stripSpecialChars(req.getCommonDataString('name', '')).substr(0, 64),
+      };
+
+       console.json({filters});
+
+      if( App.isBoolean(filters.isOpen) && filters.isOpen )
+        restaurantWhere['isOpen'] = true;
+
+      if( App.isString(filters.type) && restaurantTypes.includes( filters.type ) )
+        restaurantWhere['type'] = filters.type;
+
+      if( App.isString(filters.name) && filters.name.length >= 1 )
+        restaurantWhere['name'] = { [ App.DB.Op.like ]: `%${filters.name}%` };
+
+       console.json({mUser});
+       console.json({mClient});
+
+      if( 
+        filters.searchNearByMe
+        &&
+        (
+          (App.isObject(mUser) && App.isPosNumber(mUser.id))
+          ||
+          App.isObject(res.info)
+        )
+      ){
+        const mSearchNearByClientSettings = await App.getModel('SearchNearByClientSettings').getSettings(false);
+        if( App.isObject(mSearchNearByClientSettings) && App.isPosNumber(mSearchNearByClientSettings.id) ){
+
+
+	const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+  where: {
+    clientId: mClient.id,  // Assuming clientId is stored in mClient
+    isDefault: true,
+    isDeleted: false, // Ensure the address is not deleted
+  },
+});
+console.log(defaultAddress);
+// Destructure lat and lon from the default address or fall back to res.info
+const { lat, lon } = defaultAddress ? defaultAddress : { ...(App.isObject(res.info) ? res.info : {}) };
+
+if (!defaultAddress) {
+  console.log('No default delivery address found for this user.');
+}
+
+
+
+ //         const {lat, lon} = { ...(App.isObject(mUser)?mUser:res.info) };
+	  console.log({ mUser, resInfo: res.info });
+          console.log({lat, lon});
+          restaurantWhere[App.DB.Op.and] = [
+            { lat: { [App.DB.Op.gte]: App.geo.lib.fixCoord(lat - mSearchNearByClientSettings.maxSearchSquareInDegrees) } },
+            { lat: { [App.DB.Op.lte]: App.geo.lib.fixCoord(lat + mSearchNearByClientSettings.maxSearchSquareInDegrees) } },
+            { lon: { [App.DB.Op.gte]: App.geo.lib.fixCoord(lon - mSearchNearByClientSettings.maxSearchSquareInDegrees) } },
+            { lon: { [App.DB.Op.lte]: App.geo.lib.fixCoord(lon + mSearchNearByClientSettings.maxSearchSquareInDegrees) } },
+          ];
+        }
+      }
+
+      const mRestaurants = await App.getModel('Restaurant').findAndCountAll({
+        where: restaurantWhere,
+        distinct: true,
+        attributes: [
+          'id','name','image','zip','street',
+          'rating','type','lat','lon','isOpen','shareableLink',
+        ],
+        include: [{
+          required: true,
+          model: App.getModel('MenuCategory'),
+          where: {
+            isDeleted: false,
+          },
+          attributes: ['id','name'],
+          include: [{
+            required: true,
+            model: App.getModel('MenuItem'),
+            where: {
+              isAvailable: true,
+              isDeleted: false,
+            },
+            attributes: [],
+          }],
+        }],
+        order: [[ orderBy, order ]],
+        offset: offset,
+        limit: limit,
+      });
+
+      const mDeliveryPriceSettings = await App.getModel('DeliveryPriceSettings').getSettings();
+
+      if( App.isArray(mRestaurants.rows) && mRestaurants.rows.length ){
+        for( const mRestaurant of mRestaurants.rows ){
+          if( App.isObject(mRestaurant) && App.isPosNumber(mRestaurant.id) ){
+            // mRestaurant.image = App.S3.getUrlByName(mRestaurant.image);
+
+            mRestaurant.dataValues.distance = 0;
+            mRestaurant.dataValues.distanceType = '';
+
+let deliveryCoords = { lat: mUser.lat, lon: mUser.lon }; // Default to user's coordinates
+
+ const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+  where: {
+    clientId: mClient.id,  // Assuming clientId is stored in mClient
+    isDefault: true,
+    isDeleted: false, // Ensure the address is not deleted
+  },
+});
+
+
+if (defaultAddress) {
+  deliveryCoords = {
+    lat: defaultAddress.lat,
+    lon: defaultAddress.lon,
+  };
+} else {
+  console.log('No default delivery address found for this user.');
+}
+
+console.log(deliveryCoords);
+
+            if( App.isObject(mUser) && App.isPosNumber(mUser.id) ){
+              const distRes = App.geo.lib.getDistance( deliveryCoords, mRestaurant, mDeliveryPriceSettings.unitType );
+
+              if( distRes.success ){
+                mRestaurant.dataValues.distance = distRes.data.distance;
+                mRestaurant.dataValues.distanceType = distRes.data.units;
+                // mRestaurant.dataValues.distance = 1.25;
+                // mRestaurant.dataValues.distanceType = 'km';                
+              }
+            }
+
+          }
+        }
+      }
+
+      App.json( res, true, App.t('success', res.lang), mRestaurants);
+
+    }catch(e){
+      console.log(e);
+      App.onRouteError( req, res, e );
+      // App.json( res, false, App.t('request-could-not-be-processed', req.lang) );
+    }
+
+  });
+
+  return { router, method: '', autoDoc:{} };
+
+};
+
+
