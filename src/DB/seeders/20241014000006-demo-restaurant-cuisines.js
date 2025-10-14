@@ -34,6 +34,55 @@ module.exports = {
     };
 
     const restaurantCuisines = [
+      // Food Truck - American, Fast Food
+      {
+        restaurantId: getRestaurantId('Food Truck'),
+        cuisineTypeId: getCuisineId('american'),
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        restaurantId: getRestaurantId('Food Truck'),
+        cuisineTypeId: getCuisineId('fast-food'),
+        createdAt: now,
+        updatedAt: now,
+      },
+
+      // Stationary restaurant - American, Fast Food
+      {
+        restaurantId: getRestaurantId('Stationary restaurant'),
+        cuisineTypeId: getCuisineId('italian'),
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        restaurantId: getRestaurantId('Stationary restaurant'),
+        cuisineTypeId: getCuisineId('fast-food'),
+        createdAt: now,
+        updatedAt: now,
+      },
+      
+      // Chao min - American, Fast Food
+      {
+        restaurantId: getRestaurantId('Chao min'),
+        cuisineTypeId: getCuisineId('italian'),
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        restaurantId: getRestaurantId('Chao min'),
+        cuisineTypeId: getCuisineId('mexican'),
+        createdAt: now,
+        updatedAt: now,
+      },
+      
+      // Original Tommy's  Hamburgers - American, Fast Food
+      {
+        restaurantId: getRestaurantId(`Original Tommy's  Hamburgers`),
+        cuisineTypeId: getCuisineId('italian'),
+        createdAt: now,
+        updatedAt: now,
+      },
       // Delicious Burgers & More - American, Fast Food
       {
         restaurantId: getRestaurantId('Delicious Burgers & More'),

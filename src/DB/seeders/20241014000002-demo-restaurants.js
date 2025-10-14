@@ -19,7 +19,7 @@ module.exports = {
       // Restaurant 1 - Burger Place (Manager: John Smith)
       {
         userId: managers[0].id, // manager.burgers@wxwdelivery.com
-        cityId: 5987, // Auburn
+        cityId: null, // No city assigned (would be Auburn - 36830)
         name: 'Delicious Burgers & More',
         description: 'The best burgers in town! Fresh ingredients, homemade buns, and premium beef. Try our signature bacon cheeseburger!',
         type: 'stationary',
@@ -55,7 +55,7 @@ module.exports = {
       // Restaurant 2 - Pizza Place (Manager: Maria Garcia)
       {
         userId: managers[1].id, // manager.pizza@wxwdelivery.com
-        cityId: 5987, // Auburn
+        cityId: null, // No city assigned (would be Auburn - 36830)
         name: 'Italian Pizza House',
         description: 'Authentic Italian pizza made with love. Wood-fired oven, imported Italian ingredients, and traditional recipes from Naples.',
         type: 'stationary',
@@ -91,7 +91,7 @@ module.exports = {
       // Restaurant 3 - Sushi Place (Manager: David Chen)
       {
         userId: managers[2].id, // manager.sushi@wxwdelivery.com
-        cityId: 5984, // Athens
+        cityId: null, // No city assigned (would be Athens - 35611)
         name: 'Tokyo Sushi & Asian Fusion',
         description: 'Fresh sushi daily! Experience authentic Japanese cuisine with a modern twist. All-you-can-eat sushi on Wednesdays!',
         type: 'stationary',
@@ -127,7 +127,7 @@ module.exports = {
       // Restaurant 4 - Mexican Food Truck (Manager: Carlos Rodriguez)
       {
         userId: managers[3].id, // manager.taco@wxwdelivery.com
-        cityId: 5982, // Anniston
+        cityId: null, // No city assigned (would be Anniston - 36201)
         name: 'El Loco Taco Truck',
         description: 'Authentic Mexican street food on wheels! Fresh tacos, burritos, quesadillas made to order. Find us at different locations daily!',
         type: 'mobile',
