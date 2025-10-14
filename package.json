@@ -13,7 +13,12 @@
     "db:reset:dev": "NODE_ENV=dev npx sequelize db:migrate:undo:all && NODE_ENV=dev npx sequelize db:migrate && NODE_ENV=dev npx sequelize db:seed:all",
     "start:rem": "NODE_ENV=rem nodemon index.js",
     "pm2:rem": "pm2 restart pm2.rem.ecosystem.config.js --env rem",
-    "migrate:rem": "NODE_ENV=rem npx sequelize db:migrate --env dev"
+    "migrate:rem": "NODE_ENV=rem npx sequelize db:migrate --env dev",
+    "docker:rebuild": "./scripts/rebuild-dev.sh",
+    "docker:restart": "./scripts/restart-dev.sh",
+    "docker:logs": "./scripts/logs-dev.sh",
+    "docker:exec": "./scripts/exec-dev.sh",
+    "docker:seed": "./scripts/exec-dev.sh npm run seed:dev"
   },
   "keywords": [],
   "author": "",
