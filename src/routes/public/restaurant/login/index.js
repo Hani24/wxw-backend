@@ -20,7 +20,7 @@ const router = express.Router();
 
 module.exports = function(App, RPath){
 
-  router.use('', App.modifiers.noBots, async(req, res)=>{
+  router.use('', async(req, res)=>{
 
     try{
 
