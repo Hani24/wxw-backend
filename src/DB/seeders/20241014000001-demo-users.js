@@ -28,7 +28,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5978, // Alabaster
+        cityId: null, // No city assigned
         image: 'default.male.png',
         isNewUser: false,
         lang: 'en',
@@ -48,7 +48,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5978,
+        cityId: null, // No city assigned
         image: 'default.male.png',
         isNewUser: false,
         lang: 'en',
@@ -70,7 +70,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5987, // Auburn
+        cityId: null, // No city assigned
         street: '123 Main St',
         zip: '36830',
         image: 'default.male.png',
@@ -92,7 +92,7 @@ module.exports = {
         gender: 'female',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5987, // Auburn
+        cityId: null, // No city assigned
         street: '456 Oak Ave',
         zip: '36830',
         image: 'default.female.png',
@@ -114,7 +114,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5984, // Athens
+        cityId: null, // No city assigned
         street: '789 Elm St',
         zip: '35611',
         image: 'default.male.png',
@@ -136,7 +136,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5982, // Anniston
+        cityId: null, // No city assigned
         street: '321 Maple Dr',
         zip: '36201',
         image: 'default.male.png',
@@ -161,7 +161,7 @@ module.exports = {
         isEmailVerified: true,
         isPhoneVerified: true,
         // restaurantId will be set after restaurant is created
-        cityId: 5987,
+        cityId: null, // No city assigned
         image: 'default.female.png',
         isNewUser: false,
         lang: 'en',
@@ -182,7 +182,7 @@ module.exports = {
         isEmailVerified: true,
         isPhoneVerified: true,
         // restaurantId will be set after restaurant is created
-        cityId: 5987,
+        cityId: null, // No city assigned
         image: 'default.male.png',
         isNewUser: false,
         lang: 'en',
@@ -204,7 +204,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5987,
+        cityId: null, // No city assigned
         image: 'default.male.png',
         isNewUser: false,
         lang: 'en',
@@ -224,7 +224,7 @@ module.exports = {
         gender: 'female',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5984,
+        cityId: null, // No city assigned
         image: 'default.female.png',
         isNewUser: false,
         lang: 'en',
@@ -244,7 +244,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5982,
+        cityId: null, // No city assigned
         image: 'default.male.png',
         isNewUser: false,
         lang: 'en',
@@ -266,7 +266,7 @@ module.exports = {
         gender: 'female',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5987,
+        cityId: null, // No city assigned
         street: '100 Client St',
         zip: '36830',
         image: 'default.female.png',
@@ -288,7 +288,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5987,
+        cityId: null, // No city assigned
         street: '200 Customer Ave',
         zip: '36830',
         image: 'default.male.png',
@@ -310,7 +310,7 @@ module.exports = {
         gender: 'female',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5984,
+        cityId: null, // No city assigned
         street: '300 Buyer Rd',
         zip: '35611',
         image: 'default.female.png',
@@ -332,7 +332,7 @@ module.exports = {
         gender: 'male',
         isEmailVerified: true,
         isPhoneVerified: true,
-        cityId: 5982,
+        cityId: null, // No city assigned
         street: '400 Patron Ln',
         zip: '36201',
         image: 'default.male.png',
