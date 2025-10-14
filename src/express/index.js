@@ -120,8 +120,8 @@ module.exports = async( App )=>{
       // console.json({geoipRes});
       const _country = geoipRes.success ? geoipRes.data.country : 'n/a'; // req.headers['cf-ipcountry'] || '';
       const _timezone = geoipRes.success ? geoipRes.data.timezone : 'n/a';
-      let lat = null;
-      let lon = null;
+      let lat = 0;
+      let lon = 0;
 
       if( App.isArray(geoipRes.data.ll) && geoipRes.data.ll.length === 2 ){
         lat = +(geoipRes.data.ll[0]);

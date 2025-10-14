@@ -2,16 +2,16 @@
 
 /**
  * Demo Restaurants Seeder
- * Creates sample restaurants linked to manager users
+ * Creates sample restaurants linked to restaurant owner users
  */
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     const now = new Date();
 
-    // Get the user IDs for managers
+    // Get the user IDs for restaurant owners
     const managers = await queryInterface.sequelize.query(
-      `SELECT id, email FROM Users WHERE role = 'manager' ORDER BY id`,
+      `SELECT id, email FROM Users WHERE role = 'restaurant' ORDER BY id`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 

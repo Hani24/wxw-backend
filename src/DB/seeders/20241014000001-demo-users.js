@@ -59,9 +59,9 @@ module.exports = {
         lastSeenAt: now,
       },
 
-      // Restaurant Managers (for creating restaurants)
+      // Restaurant Owners (for creating restaurants)
       {
-        role: 'manager',
+        role: 'restaurant',
         phone: '+11234567892',
         email: 'manager.burgers@wxwdelivery.com',
         password: hashedPassword,
@@ -83,7 +83,7 @@ module.exports = {
         lastSeenAt: now,
       },
       {
-        role: 'manager',
+        role: 'restaurant',
         phone: '+11234567893',
         email: 'manager.pizza@wxwdelivery.com',
         password: hashedPassword,
@@ -105,7 +105,7 @@ module.exports = {
         lastSeenAt: now,
       },
       {
-        role: 'manager',
+        role: 'restaurant',
         phone: '+11234567894',
         email: 'manager.sushi@wxwdelivery.com',
         password: hashedPassword,
@@ -127,7 +127,7 @@ module.exports = {
         lastSeenAt: now,
       },
       {
-        role: 'manager',
+        role: 'restaurant',
         phone: '+11234567895',
         email: 'manager.taco@wxwdelivery.com',
         password: hashedPassword,
