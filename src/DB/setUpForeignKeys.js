@@ -44,6 +44,8 @@ module.exports = async(App, params={})=>{
   const State = App.getModel('State');
   const City = App.getModel('City');
 
+  const CuisineType = App.getModel('CuisineType');
+
   const UserSettings = App.getModel('UserSettings');
 
   const ClientNotification = App.getModel('ClientNotification');
@@ -133,6 +135,18 @@ module.exports = async(App, params={})=>{
 
   RestaurantTransfer.belongsTo(Restaurant, { foreignKey: 'restaurantId' } );
   Restaurant.hasMany(RestaurantTransfer, { foreignKey: 'restaurantId' } );
+
+  // [restaurant-cuisine] Many-to-Many
+  Restaurant.belongsToMany(CuisineType, {
+    through: 'RestaurantCuisines',
+    foreignKey: 'restaurantId',
+    otherKey: 'cuisineTypeId'
+  });
+  CuisineType.belongsToMany(Restaurant, {
+    through: 'RestaurantCuisines',
+    foreignKey: 'cuisineTypeId',
+    otherKey: 'restaurantId'
+  });
 
   // [courier]
   Courier.belongsTo(User, { foreignKey: 'userId' } );

@@ -171,7 +171,7 @@ module.exports = function(App, RPath){
             )
         `);
         
-        // Get menu categories for each restaurant
+        // Get menu categories and cuisine types for each restaurant
         let restaurantsWithCategories = [];
         for (const restaurant of restaurants) {
           // Query menu categories for this restaurant
@@ -187,7 +187,17 @@ module.exports = function(App, RPath){
               AND isDeleted = false
             )
           `);
-          
+
+          // Query cuisine types for this restaurant
+          const [cuisineTypes] = await App.DB.sequelize.query(`
+            SELECT ct.id, ct.name, ct.slug, ct.description, ct.image
+            FROM CuisineTypes ct
+            INNER JOIN RestaurantCuisines rc ON ct.id = rc.cuisineTypeId
+            WHERE rc.restaurantId = ${restaurant.id}
+            AND ct.isActive = true
+            ORDER BY ct.order ASC
+          `);
+
           // Format restaurant with S3 URL and proper distance format
           const formattedRestaurant = {
             image: App.S3.getUrlByName(restaurant.image),
@@ -202,10 +212,17 @@ module.exports = function(App, RPath){
             lon: restaurant.lon,
             isOpen: restaurant.isOpen === 1,
             MenuCategories: categories,
+            CuisineTypes: cuisineTypes.map(ct => ({
+              id: ct.id,
+              name: ct.name,
+              slug: ct.slug,
+              description: ct.description,
+              image: ct.image ? App.S3.getUrlByName(ct.image) : ''
+            })),
             distance: parseFloat(restaurant.calculatedDistance.toFixed(2)),
             distanceType: "mile"
           };
-          
+
           restaurantsWithCategories.push(formattedRestaurant);
         }
         
@@ -224,23 +241,32 @@ module.exports = function(App, RPath){
             'id', 'name', 'image', 'zip', 'street',
             'rating', 'type', 'lat', 'lon', 'isOpen', 'shareableLink'
           ],
-          include: [{
-            required: true,
-            model: App.getModel('MenuCategory'),
-            where: {
-              isDeleted: false,
-            },
-            attributes: ['id', 'name'],
-            include: [{
+          include: [
+            {
               required: true,
-              model: App.getModel('MenuItem'),
+              model: App.getModel('MenuCategory'),
               where: {
-                isAvailable: true,
                 isDeleted: false,
               },
-              attributes: [],
-            }],
-          }],
+              attributes: ['id', 'name'],
+              include: [{
+                required: true,
+                model: App.getModel('MenuItem'),
+                where: {
+                  isAvailable: true,
+                  isDeleted: false,
+                },
+                attributes: [],
+              }],
+            },
+            {
+              required: false,
+              model: App.getModel('CuisineType'),
+              through: { attributes: [] }, // Exclude junction table fields
+              attributes: ['id', 'name', 'slug', 'description', 'image'],
+              where: { isActive: true }
+            }
+          ],
           order: [[orderBy, order]],
           offset: offset,
           limit: limit,

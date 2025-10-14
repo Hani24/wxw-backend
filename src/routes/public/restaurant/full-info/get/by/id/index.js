@@ -37,15 +37,24 @@ module.exports = function (App, RPath) {
           'shareableLink'
           //,'updatedAt',
         ],
-        include: [{
-          model: App.getModel('City'),
-          attributes: ['id', 'name'],
-          required: true,
-          include: [{
-            model: App.getModel('State'),
-            attributes: ['id', 'name', 'code']
-          }]
-        }]
+        include: [
+          {
+            model: App.getModel('City'),
+            attributes: ['id', 'name'],
+            required: true,
+            include: [{
+              model: App.getModel('State'),
+              attributes: ['id', 'name', 'code']
+            }]
+          },
+          {
+            model: App.getModel('CuisineType'),
+            through: { attributes: [] }, // Exclude junction table fields
+            attributes: ['id', 'name', 'slug', 'description', 'image'],
+            where: { isActive: true },
+            required: false
+          }
+        ]
       });
 
       if (!App.isObject(mRestaurant) || !App.isPosNumber(mRestaurant.id))

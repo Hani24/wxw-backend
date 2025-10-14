@@ -8,6 +8,9 @@
     "tests": "NODE_ENV=dev NODE_TESTS=true nodemon index.js",
     "pm2:dev": "pm2 restart pm2.dev.ecosystem.config.js --env dev",
     "migrate:dev": "NODE_ENV=dev npx sequelize db:migrate --env dev",
+    "seed:dev": "NODE_ENV=dev npx sequelize db:seed:all",
+    "seed:undo:dev": "NODE_ENV=dev npx sequelize db:seed:undo:all",
+    "db:reset:dev": "NODE_ENV=dev npx sequelize db:migrate:undo:all && NODE_ENV=dev npx sequelize db:migrate && NODE_ENV=dev npx sequelize db:seed:all",
     "start:rem": "NODE_ENV=rem nodemon index.js",
     "pm2:rem": "pm2 restart pm2.rem.ecosystem.config.js --env rem",
     "migrate:rem": "NODE_ENV=rem npx sequelize db:migrate --env dev"
