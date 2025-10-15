@@ -19,7 +19,26 @@ module.exports = function (App, RPath) {
 console.log("order create data: ", data);
       const mUser = await req.user;
       const mClient = await req.client;
-	
+
+      // Check if user already has an active order
+      const statuses = App.getModel('Order').getStatuses();
+      const existingActiveOrder = await App.getModel('Order').findOne({
+        where: {
+          clientId: mClient.id,
+          status: {
+            [App.DB.Op.or]: [
+              statuses['created'],
+              statuses['processing'],
+            ]
+          },
+        },
+        attributes: ['id', 'status'],
+      });
+
+      if (existingActiveOrder) {
+        return App.json(res, 417, App.t(['You already have an active order. Please wait until it is completed before placing a new one.'], req.lang));
+      }
+
       if ((await App.getModel('Cart').isCartEmptyByClientId(mClient.id)))
         return App.json(res, 417, App.t(['Cart', 'is-empty'], req.lang));
 
@@ -86,26 +105,33 @@ console.log("order create data: ", data);
 
       // use google api if default address is available, else dont spend api requests, client will have to select real delivery-address
       // => updated in: /private/client/orders/set/delivery-address
-      let calcOptimalDistanceRes = await App.getModel('DeliveryPriceSettings')
-        .calcOptimalDistance(mEndPoint, mRestaurants, mDeliveryPriceSettings, {
-          // useGoogle: App.isObject(mDeliveryAddress) && App.isPosNumber(mDeliveryAddress.id), 
-          useGoogle: true,
-        });
-	    // if(isPickup){
-         // calcOptimalDistanceRes = {
-           // success: true,
-           // message: 'success',
-           // data: {
-             // deliveryPrice: 0.0,
-            //  duration: {
-                //seconds: 0,
-              //},
-              //distance: {
-               // mile: 0,
-             // },
-           // }
-          //};
-      //  }
+      let calcOptimalDistanceRes;
+
+      if(isPickup){
+        // For pickup orders, skip distance calculation
+        calcOptimalDistanceRes = {
+          success: true,
+          message: 'success',
+          data: {
+            deliveryPrice: 0.0,
+            duration: {
+              seconds: 0,
+            },
+            distance: {
+              mile: 0,
+              kilometer: 0,
+              meter: 0,
+              feet: 0,
+            },
+          }
+        };
+      } else {
+        calcOptimalDistanceRes = await App.getModel('DeliveryPriceSettings')
+          .calcOptimalDistance(mEndPoint, mRestaurants, mDeliveryPriceSettings, {
+            // useGoogle: App.isObject(mDeliveryAddress) && App.isPosNumber(mDeliveryAddress.id),
+            useGoogle: true,
+          });
+      }
 
       // test:data
       // const calcOptimalDistanceRes = {
