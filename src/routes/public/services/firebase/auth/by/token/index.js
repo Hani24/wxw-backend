@@ -68,32 +68,68 @@ module.exports = function(App, RPath){
       }
 
       const data_t = authRes.data;
-      const phone = App.tools.cleanPhone( data_t.phone_number );
+
+      const provider = (data_t.firebase && data_t.firebase.sign_in_provider)
+        ? data_t.firebase.sign_in_provider
+        : null;
+
       const password = await App.BCrypt.randomSecurePassword();
       const hash = await App.BCrypt.hash( password );
 
-      if( !App.tools.isValidPhone(data_t.phone_number) )
-        return await App.json(res, 417, App.t(['phone','number','is-not','valid'], req.lang));
+      let phone = null;
+      let email = null;
+      let isPhoneAuth = false;
+      let isEmailAuth = false;
 
-	let existingUser = await App.getModel('User').getByFields({phone});
-	let isNewUser = !existingUser;
-     // const isNewUser = !(!!(await App.getModel('User').isset({phone})));
+      // Determine authentication provider and extract credentials
+      if (provider === 'phone') {
+        // Phone authentication
+        phone = App.tools.cleanPhone(data_t.phone_number);
+
+        if (!App.tools.isValidPhone(data_t.phone_number))
+          return await App.json(res, 417, App.t(['phone','number','is-not','valid'], req.lang));
+
+        isPhoneAuth = true;
+
+      } else if (provider === 'password') {
+        // Email authentication
+        email = App.tools.normalizeEmail(data_t.email);
+
+        if (!App.tools.isValidEmail(email))
+          return await App.json(res, 417, App.t(['email','is-not','valid'], req.lang));
+
+        isEmailAuth = true;
+        // Generate unique placeholder for phone field (unique constraint)
+        phone = `EMAIL_${data_t.uid}`;
+
+      } else {
+        return await App.json(res, 417, App.t(['authentication','provider','not','supported'], req.lang));
+      }
+
+      // Find existing user by phone or email depending on provider
+      const whereClause = isEmailAuth ? { email } : { phone };
+      let existingUser = await App.getModel('User').getByFields(whereClause);
+      let isNewUser = !existingUser;
 
       // if( isNewUser ){
       //   if( ![roles.client, roles.courier].includes(type) )
       //     return await App.json( res, 417, App.t(['selected', 'account','type','is-not','supported'], req.lang), [roles.client, roles.courier] );
       // }
 
-   if (!isNewUser && type === roles.client && existingUser.role !== roles.client) {
+      if (!isNewUser && type === roles.client && existingUser.role !== roles.client) {
         isNewUser = true;
         existingUser = null;
       }
-	const mUser = isNewUser 
+
+      // Create new user with appropriate credentials based on auth provider
+      const mUser = isNewUser
         ? await App.getModel('User').create({
-            phone,
+            phone: phone,
             password: hash,
-            email: '',
+            email: isEmailAuth ? email : '',
             role: type,
+            isPhoneVerified: isPhoneAuth,
+            isEmailVerified: isEmailAuth,
           })
         : existingUser;
 
@@ -168,13 +204,21 @@ module.exports = function(App, RPath){
       if( mClient.isRestricted || mClient.isDeleted )
         return await App.json(res, 403, App.t(['Please, note that this account has been blocked. Contact us for any further information.'], req.lang));
 
-      // it will be verified by {apple,google, etc...}
-      const userUpdateRes = await mUser.update({
-        isPhoneVerified: true,
+      // it will be verified by {apple,google, firebase, etc...}
+      const updateData = {
         timezone: res.info.timezone,
         role: type,
-	      //  role: [roles.client, roles.courier].includes(type) ? type : mUser.role,
-      });
+        //  role: [roles.client, roles.courier].includes(type) ? type : mUser.role,
+      };
+
+      // Update verification status based on auth provider
+      if (isPhoneAuth) {
+        updateData.isPhoneVerified = true;
+      } else if (isEmailAuth) {
+        updateData.isEmailVerified = true;
+      }
+
+      const userUpdateRes = await mUser.update(updateData);
 
       if( !App.isObject(userUpdateRes) || !App.isPosNumber(userUpdateRes.id) )
         return await App.json( res, false, App.t(['failed','to','update','user','profile'], req.lang));
