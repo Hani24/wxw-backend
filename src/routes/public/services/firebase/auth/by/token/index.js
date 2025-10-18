@@ -91,8 +91,8 @@ module.exports = function(App, RPath){
 
         isPhoneAuth = true;
 
-      } else if (provider === 'password') {
-        // Email authentication
+      } else if (provider === 'password' || provider === 'google.com') {
+        // Email authentication (password-based or Google)
         email = App.tools.normalizeEmail(data_t.email);
 
         if (!App.tools.isValidEmail(email))
