@@ -20,25 +20,6 @@ console.log("order create data: ", data);
       const mUser = await req.user;
       const mClient = await req.client;
 
-      // Check if user already has an active order
-      const statuses = App.getModel('Order').getStatuses();
-      const existingActiveOrder = await App.getModel('Order').findOne({
-        where: {
-          clientId: mClient.id,
-          status: {
-            [App.DB.Op.or]: [
-              statuses['created'],
-              statuses['processing'],
-            ]
-          },
-        },
-        attributes: ['id', 'status'],
-      });
-
-      if (existingActiveOrder) {
-        return App.json(res, 417, App.t(['You already have an active order. Please wait until it is completed before placing a new one.'], req.lang));
-      }
-
       if ((await App.getModel('Cart').isCartEmptyByClientId(mClient.id)))
         return App.json(res, 417, App.t(['Cart', 'is-empty'], req.lang));
 

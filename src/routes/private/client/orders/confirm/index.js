@@ -28,6 +28,27 @@ module.exports = function(App, RPath){
       if( App.isNull(id) )
         return await App.json( res, 417, App.t(['Order id is required'], req.lang) );
 
+      // Check if user already has an active order (excluding the current order being confirmed)
+      const existingActiveOrder = await App.getModel('Order').findOne({
+        where: {
+          clientId: mClient.id,
+          id: {
+            [App.DB.Op.ne]: id  // Not equal to current order
+          },
+          status: {
+            [App.DB.Op.or]: [
+              statuses['created'],
+              statuses['processing'],
+            ]
+          },
+        },
+        attributes: ['id', 'status'],
+      });
+
+      if (existingActiveOrder) {
+        return App.json(res, 417, App.t(['You already have an active order. Please wait until it is completed before placing a new one.'], req.lang));
+      }
+
       mOrder = await App.getModel('Order').findOne({
         where: {
           id,
