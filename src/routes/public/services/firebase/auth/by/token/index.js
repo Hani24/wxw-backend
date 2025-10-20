@@ -218,6 +218,12 @@ module.exports = function(App, RPath){
         updateData.isEmailVerified = true;
       }
 
+      // If this is not a new user, mark them as such in the database
+      // This ensures the database field stays in sync with the actual user state
+      if (!isNewUser) {
+        updateData.isNewUser = false;
+      }
+
       const userUpdateRes = await mUser.update(updateData);
 
       if( !App.isObject(userUpdateRes) || !App.isPosNumber(userUpdateRes.id) )
@@ -295,11 +301,11 @@ module.exports = function(App, RPath){
       const mUserSettings = await App.getModel('UserSettings').getByUserId( mUser.id );
 
       /* await */ App.json( res, true, App.t('success', res.lang), {
-        userId: mUser.id, 
-        sessionId: mSession.id, 
+        userId: mUser.id,
+        sessionId: mSession.id,
         token: jwtToken,
-        isNewUser: mUser.isNewUser,
-	isEmailVerified: mUser.isEmailVerified,
+        isNewUser: isNewUser,  // Use the local variable, not the database field
+	isEmailVerified: userUpdateRes.isEmailVerified,
         hasCourierAccount,
         isCourierInited: (hasCourierAccount && (!! mUser.cityId)),
         role: userUpdateRes.role,
