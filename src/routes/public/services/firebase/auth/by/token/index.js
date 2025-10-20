@@ -80,6 +80,7 @@ module.exports = function(App, RPath){
       let email = null;
       let isPhoneAuth = false;
       let isEmailAuth = false;
+      let isGoogleAuth = false;
 
       // Determine authentication provider and extract credentials
       if (provider === 'phone') {
@@ -99,6 +100,8 @@ module.exports = function(App, RPath){
           return await App.json(res, 417, App.t(['email','is-not','valid'], req.lang));
 
         isEmailAuth = true;
+        isGoogleAuth = (provider === 'google.com');
+
         // Generate unique placeholder for phone field (unique constraint)
         phone = `EMAIL_${data_t.uid}`;
 
@@ -218,9 +221,25 @@ module.exports = function(App, RPath){
         updateData.isEmailVerified = true;
       }
 
-      // If this is not a new user, mark them as such in the database
-      // This ensures the database field stays in sync with the actual user state
-      if (!isNewUser) {
+      // For Google authentication, extract and populate user profile data
+      if (isGoogleAuth) {
+        // Always mark Google users as not new (auto-populate profile)
+        updateData.isNewUser = false;
+
+        // Extract name from Google token if available
+        if (data_t.name && App.isString(data_t.name)) {
+          const nameParts = data_t.name.trim().split(' ');
+          if (nameParts.length >= 2) {
+            updateData.firstName = nameParts[0];
+            updateData.lastName = nameParts.slice(1).join(' ');
+          } else if (nameParts.length === 1) {
+            updateData.firstName = nameParts[0];
+            updateData.lastName = '';
+          }
+        }
+
+      } else if (!isNewUser) {
+        // For non-Google auth, only update isNewUser for existing users
         updateData.isNewUser = false;
       }
 
@@ -304,7 +323,7 @@ module.exports = function(App, RPath){
         userId: mUser.id,
         sessionId: mSession.id,
         token: jwtToken,
-        isNewUser: isNewUser,  // Use the local variable, not the database field
+        isNewUser: isGoogleAuth ? false : isNewUser,  // Always false for Google auth (auto-populated), otherwise use calculated value
 	isEmailVerified: userUpdateRes.isEmailVerified,
         hasCourierAccount,
         isCourierInited: (hasCourierAccount && (!! mUser.cityId)),
