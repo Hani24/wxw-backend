@@ -16,12 +16,12 @@ module.exports = function(App, RPath) {
 
       const mOrders = await App.getModel('Order').findAndCountAll({
         where: {
-          isLocked: true,
+          // isLocked: true, // Removed - allow unlocked orders to show
           allSuppliersHaveConfirmed: false,
           isCanceledByClient: false,
           [App.DB.Op.and]: {
             status: {
-              [App.DB.Op.or]: [statuses.processing]
+              [App.DB.Op.or]: [statuses.created, statuses.processing]
             }
           }
         },
@@ -45,7 +45,7 @@ module.exports = function(App, RPath) {
               restaurantId: mRestaurant.id,
               isAcceptedByRestaurant: false,
               isCanceledByRestaurant: false,
-              isRequestCreated: true
+              // isRequestCreated: true // Removed - allow all pending orders to show
             },
             attributes: ['id', 'isAcceptedByRestaurant', 'isCanceledByRestaurant', 'isRequestCreated', 'requestCreatedAt', 'requestTimeLeft', 'totalPrice', 'totalItems'],
             include: [

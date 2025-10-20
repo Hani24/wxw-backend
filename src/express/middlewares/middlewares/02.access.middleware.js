@@ -115,13 +115,42 @@ module.exports = ( App, express, name )=>{
 
       // console.json({mUser});
 
+      // [GUEST USER RESTRICTIONS]
+      // Apply restrictions for guest users
+      if (req.isGuest && mUser.isGuest) {
+        // Limit number of orders per guest session (prevent abuse)
+        const guestOrderCount = await App.getModel('Order').count({
+          where: {clientId: req.client.id}
+        });
+
+        if (guestOrderCount >= 5) {
+          App.logger.warn(`[403]: Guest order limit reached: clientId=${req.client.id}`);
+          return App.json(res, 403, App.t(['guest', 'order', 'limit', 'reached', 'please', 'create', 'account'], req.lang));
+        }
+
+        // Block access to sensitive endpoints for guests
+        const guestBlockedPaths = [
+          /^\/private\/client\/payment/,
+          /^\/private\/client\/favorite/,
+          /^\/private\/client\/courier\/create/,
+        ];
+
+        if (guestBlockedPaths.some(pattern => pattern.test(req.path))) {
+          App.logger.warn(`[403]: Guest access blocked: ${req.path}`);
+          return App.json(res, 403, App.t(['feature', 'requires', 'account'], req.lang));
+        }
+      }
+
       // Only set user role properties if we haven't set the restaurant from query params
       if (!restaurantFromQuery) {
         switch( mUser.role ){
           case roles.client: {
 
             // req.jwt.role;
-            req.client = await App.getModel('Client').getByUserId( mUser.id );
+            // Skip client lookup if already set by guest session
+            if (!req.client) {
+              req.client = await App.getModel('Client').getByUserId( mUser.id );
+            }
 
             if( !App.isObject(req.client) || !App.isPosNumber(req.client.id) ){
               App.logger.warn(`[403]: middleware: [2] [access-type]: [client]: ${req.path} => ${res.info.ip}`);
@@ -129,8 +158,10 @@ module.exports = ( App, express, name )=>{
               return App.json(res, 403, App.t(['forbidden','[2*]'], req.lang));
             }
 
-            if( req.client.isDeleted || req.client.isRestricted /*|| !req.client.isVerified*/ )
+            // Check if client is deleted or restricted (allow guests even if not verified)
+            if (req.client.isDeleted || req.client.isRestricted) {
               return App.json(res, 403, App.t(['forbidden','[3]'], req.lang));
+            }
 
             // best guess based on ip, used to estimate/show distances to each resto on Mobile-App, no high precision is required
             // if( res.info.lat && res.info.lon ){

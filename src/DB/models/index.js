@@ -11,6 +11,7 @@ module.exports = async( App, params={}, sequelize )=>{
 
   const modelsFiles = console.listDir( __dirname );
 
+  // First pass: Load all models
   for( const Model of modelsFiles ){
 
     if( Model.endsWith( PATTERN ) ){
@@ -24,9 +25,6 @@ module.exports = async( App, params={}, sequelize )=>{
         commonMethods( App, models[ name ] );
         console.ok(`    #add model: ${ console.B(name) }: ${console.G('inited')}`);
 
-        if( typeof models[ name ].associate === 'function' )
-          models[ name ].associate( sequelize );
-
       }catch(e){
         console.warn(`    #add model: ${ console.B(name) }: ${console.R(e.message)}`);
         const stack = e.stack.split('\n').map((val)=>val.trim()).splice(0,4);
@@ -36,6 +34,20 @@ module.exports = async( App, params={}, sequelize )=>{
       }
     }
   };
+
+  // Second pass: Set up associations after all models are loaded
+  console.line();
+  console.ok(` #DB: => setup associations`);
+  for( const name in models ){
+    try {
+      if( typeof models[ name ].associate === 'function' ) {
+        models[ name ].associate( sequelize );
+        console.ok(`    #associate: ${ console.B(name) }: ${console.G('associated')}`);
+      }
+    } catch(e) {
+      console.warn(`    #associate: ${ console.B(name) }: ${console.R(e.message)}`);
+    }
+  }
 
   // console.json({ models: Object.keys(models) });
   return models;

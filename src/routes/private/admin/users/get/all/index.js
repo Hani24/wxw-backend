@@ -94,6 +94,9 @@ module.exports = function(App, RPath){
           'createdAt',
           'updatedAt',
           'lastSeenAt',
+          'isGuest',
+          'guestToken',
+          'guestExpiresAt'
         ],
         include: [
           {

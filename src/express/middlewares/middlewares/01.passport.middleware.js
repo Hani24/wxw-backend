@@ -33,13 +33,64 @@ module.exports = ( App, express )=>{
       }
 
       const Bearer = (header.trim().split(' ').pop().toString()).trim();
+
+      // Try JWT decode first (regular authenticated users and guests with JWT)
       const jwt_t = await App.JWT.decode(Bearer);
-      if( !App.isObject(jwt_t) || !App.isPosNumber(+jwt_t.userId) || !App.isString(jwt_t.token) ){
+
+      if( !App.isObject(jwt_t) || !App.isPosNumber(+jwt_t.userId) ){
+        // JWT decode failed - check if it's a plain guest token (backward compatibility)
+        const mGuestSession = await App.getModel('GuestSession').getByToken(Bearer);
+
+        if (App.isObject(mGuestSession) && App.isPosNumber(mGuestSession.id)) {
+          // Valid plain guest token - set user and skip JWT validation
+          req.user = mGuestSession.User;
+          req.client = mGuestSession.Client;
+          req.isGuest = true;
+          req.lang = mGuestSession.User.lang || 'en';
+          res.lang = mGuestSession.User.lang || 'en';
+          console.log(` [GUEST-PRIVATE]: Guest user authenticated via plain token: userId=${mGuestSession.userId}, clientId=${mGuestSession.clientId}`);
+
+          // Skip the rest of JWT validation and continue
+          return next();
+        }
+
+        // Neither JWT nor guest token - authentication failed
         App.logger.warn(`[403]: middleware: [0] [passport]: ${res.info.path} => ${res.info.ip}`);
         console.warn(` [403]: [0]: [${req.path}]: [${res.info.ip}]`)
         console.debug({Bearer});
         console.debug({jwt_t});
         return App.json(res, 403, App.t(['forbidden','[j]'], req.lang));
+      }
+
+      // Check if this is a guest user with JWT token
+      if (jwt_t.isGuest === true) {
+        // Guest user with JWT - validate the guest session
+        const mGuestSession = await App.getModel('GuestSession').getByToken(jwt_t.guestToken);
+
+        if (!App.isObject(mGuestSession) || !App.isPosNumber(mGuestSession.id)) {
+          App.logger.warn(`[401]: middleware: [guest-expired] [passport]: ${res.info.path} => ${res.info.ip}`);
+          console.warn(` [401]: [guest-expired]: [${req.path}]: [${res.info.ip}]`)
+          return App.json(res, 401, App.t(['guest', 'session', 'expired'], req.lang));
+        }
+
+        // Valid guest JWT - set user and client
+        req.user = mGuestSession.User;
+        req.client = mGuestSession.Client;
+        req.isGuest = true;
+        req.jwt = jwt_t;
+        req.lang = mGuestSession.User.lang || 'en';
+        res.lang = mGuestSession.User.lang || 'en';
+        console.log(` [GUEST-PRIVATE-JWT]: Guest user authenticated via JWT: userId=${mGuestSession.userId}, clientId=${mGuestSession.clientId}`);
+
+        // Update last seen
+        /* await */ mGuestSession.User.update({
+          timezone: (res.info.timezone || mGuestSession.User.timezone || 'n/a'),
+          lastSeenAt: App.getISODate(),
+          lat: res.info.lat,
+          lon: res.info.lon,
+        });
+
+        return next();
       }
 
       // validate {.role} in prod
@@ -121,64 +172,95 @@ module.exports = ( App, express )=>{
 
       if( header ){
         const Bearer = (header.split(' ').pop().toString()).trim();
+
+        // Try JWT decode first (regular authenticated users and guests with JWT)
         const jwt_t = await App.JWT.decode(Bearer);
         if( App.isObject(jwt_t) && App.isPosNumber( +jwt_t.userId ) ){
-          const mSession = await App.getModel('Session').getByFields({
-            id: (+jwt_t.sessionId),
-            userId: (+jwt_t.userId),
-            token: jwt_t.token,
-            isDeleted: false,
-            // country: res.info.country,
-            // timezone: res.info.timezone,
-            // ip: res.info.ip,
-          });
 
-          if( App.isObject(mSession) && App.isPosNumber( +mSession.id ) ){
+          // Check if this is a guest user with JWT token
+          if (jwt_t.isGuest === true) {
+            // Guest user with JWT - validate the guest session
+            const mGuestSession = await App.getModel('GuestSession').getByToken(jwt_t.guestToken);
 
-            // if( mSession.country !== res.info.country ){
-            //   console.debug(` [/public/]: Session: [country] does not match current request... `);
-            // }
-
-            // if( mSession.ip !== res.info.ip ){
-            //   console.debug(` [/public/]: Session: [ip] does not match current request... `);
-            // }
-
-            // if( mSession.timezone !== res.info.timezone ){
-            //   console.debug(` [/public/]: Session: [timezone] does not match current request... `);
-            // }
-
-            const mUser = await App.getModel('User').getById( jwt_t.userId );
-            if( App.isObject(mUser) && App.isPosNumber( mUser.id ) ){
-
-              req.lang = mUser.lang;
-              res.lang = mUser.lang;
-
-              if( mUser.isDeleted || mUser.isRestricted /*|| !mUser.isVerified*/ ){
-                // return App.json(res, 403, App.t(['forbidden'], req.lang));
-                req.user = null;
-                req.client = null;
-                req.courier = null;
-                req.session = null;
-              }else{
-                req.user = mUser;
-                req.session = mSession;
-
-                /* await */ 
-                /*mUser.update({
-                  timezone: (res.info.timezone || mUser.timezone || ''),
-                  lastSeenAt: App.getISODate(),
-                  lat: res.info.lat,
-                  lon: res.info.lon,
-                });*/ 
-              }
+            if (App.isObject(mGuestSession) && App.isPosNumber(mGuestSession.id)) {
+              req.user = mGuestSession.User;
+              req.client = mGuestSession.Client;
+              req.isGuest = true;
+              req.lang = mGuestSession.User.lang || 'en';
+              res.lang = mGuestSession.User.lang || 'en';
+              console.log(` [GUEST-PUBLIC-JWT]: Guest user authenticated via JWT: userId=${mGuestSession.userId}, clientId=${mGuestSession.clientId}`);
+            } else {
+              console.warn(` [${req.path}]: [${res.info.ip}] => Guest JWT session expired or invalid`);
             }
+          } else {
+            // Regular user with JWT
+            const mSession = await App.getModel('Session').getByFields({
+              id: (+jwt_t.sessionId),
+              userId: (+jwt_t.userId),
+              token: jwt_t.token,
+              isDeleted: false,
+              // country: res.info.country,
+              // timezone: res.info.timezone,
+              // ip: res.info.ip,
+            });
 
-          }else{
-            console.warn(` [${req.path}]: [${res.info.ip}] => jwt/session: wrong-data || no valid session`);
-            console.debug({Bearer});
-            console.debug({jwt_t});
+            if( App.isObject(mSession) && App.isPosNumber( +mSession.id ) ){
+
+              // if( mSession.country !== res.info.country ){
+              //   console.debug(` [/public/]: Session: [country] does not match current request... `);
+              // }
+
+              // if( mSession.ip !== res.info.ip ){
+              //   console.debug(` [/public/]: Session: [ip] does not match current request... `);
+              // }
+
+              // if( mSession.timezone !== res.info.timezone ){
+              //   console.debug(` [/public/]: Session: [timezone] does not match current request... `);
+              // }
+
+              const mUser = await App.getModel('User').getById( jwt_t.userId );
+              if( App.isObject(mUser) && App.isPosNumber( mUser.id ) ){
+
+                req.lang = mUser.lang;
+                res.lang = mUser.lang;
+
+                if( mUser.isDeleted || mUser.isRestricted /*|| !mUser.isVerified*/ ){
+                  // return App.json(res, 403, App.t(['forbidden'], req.lang));
+                  req.user = null;
+                  req.client = null;
+                  req.courier = null;
+                  req.session = null;
+                }else{
+                  req.user = mUser;
+                  req.session = mSession;
+
+                  /* await */
+                  /*mUser.update({
+                    timezone: (res.info.timezone || mUser.timezone || ''),
+                    lastSeenAt: App.getISODate(),
+                    lat: res.info.lat,
+                    lon: res.info.lon,
+                  });*/
+                }
+              }
+
+            }else{
+              console.warn(` [${req.path}]: [${res.info.ip}] => jwt/session: wrong-data || no valid session`);
+              console.debug({Bearer});
+              console.debug({jwt_t});
+            }
           }
 
+        } else {
+          // JWT decode failed - check if it's a plain guest token (backward compatibility)
+          const mGuestSession = await App.getModel('GuestSession').getByToken(Bearer);
+
+          if (App.isObject(mGuestSession) && App.isPosNumber(mGuestSession.id)) {
+            req.user = mGuestSession.User;
+            req.client = mGuestSession.Client;
+            req.isGuest = true;
+            console.log(` [GUEST-PUBLIC]: Guest user authenticated via plain token: userId=${mGuestSession.userId}, clientId=${mGuestSession.clientId}`);
+          }
         }
       }
 

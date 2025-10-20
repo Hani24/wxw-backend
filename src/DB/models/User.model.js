@@ -35,6 +35,15 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     isNewUser: {
       type: DataTypes.BOOLEAN, allowNull: true, defaultValue: true
     },
+    isGuest: {
+      type: DataTypes.BOOLEAN, allowNull: true, defaultValue: false
+    },
+    guestToken: {
+      type: DataTypes.STRING(64), allowNull: true, defaultValue: null,
+    },
+    guestExpiresAt: {
+      type: DataTypes.DATE, allowNull: true, defaultValue: null,
+    },
     // email: {
     //   type: DataTypes.STRING, allowNull: false, unique: true,
     // },
