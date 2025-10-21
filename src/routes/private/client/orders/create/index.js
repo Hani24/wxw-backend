@@ -23,6 +23,19 @@ console.log("order create data: ", data);
       if ((await App.getModel('Cart').isCartEmptyByClientId(mClient.id)))
         return App.json(res, 417, App.t(['Cart', 'is-empty'], req.lang));
 
+      // Clean up any existing unpaid/unconfirmed orders before creating a new one
+      const statuses = App.getModel('Order').getStatuses();
+      await App.getModel('Order').update(
+        { status: statuses['discarded'] },
+        {
+          where: {
+            clientId: mClient.id,
+            status: statuses['created'],
+            isPaid: false,
+          }
+        }
+      );
+
       const code = req.getCommonDataString('code', null);
 	const isPickup = App.getBoolFromValue(data.isPickup);
 	    console.log("order create: isPickup: ", isPickup);

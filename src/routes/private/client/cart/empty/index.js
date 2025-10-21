@@ -15,6 +15,19 @@ module.exports = function(App, RPath){
 
       const isEmpty = await App.getModel('Cart').emptyByClientId(mClient.id);
 
+      // Also discard any unpaid/unconfirmed orders when cart is emptied
+      const statuses = App.getModel('Order').getStatuses();
+      await App.getModel('Order').update(
+        { status: statuses['discarded'] },
+        {
+          where: {
+            clientId: mClient.id,
+            status: statuses['created'],
+            isPaid: false,
+          }
+        }
+      );
+
       App.json( res, true, App.t('success', res.lang), {isEmpty} );
 
     }catch(e){
