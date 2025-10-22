@@ -257,9 +257,9 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       },
       distinct: true,
       attributes: [
-        'id', 'status', 'totalPrice', 'totalItems',
+        'id', 'status', 'orderType', 'totalPrice', 'totalItems',
         'isDeliveredByCourier', 'deliveredByCourierAt',
-        'isCourierRatedByClient', 'courierRatedByClientAt', 
+        'isCourierRatedByClient', 'courierRatedByClientAt',
         'courierRating',
         'isOrderRatedByClient', 'orderRatedByClientAt',
         'isRejectedByClient', 'rejectedByClientAt', 'rejectionReason',
@@ -288,6 +288,17 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
               'id','phone','gender','image','firstName','lastName',
             ],
           }]
+        },
+        {
+          required: false, // Optional - only for on-site presence orders
+          model: App.getModel('OrderOnSitePresenceDetails'),
+          attributes: [
+            'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+            'numberOfPeople', 'numberOfHours', 'specialRequests',
+            'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+            'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+            'acceptanceDeadline',
+          ],
         },
         {
           required: true,
@@ -324,7 +335,7 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
             include: [{
               model: App.getModel('MenuItem'),
               attributes: [
-                'id', 
+                'id',
                 'name','image','rating','isAvailable','price',
                 // 'order','description','kcal','proteins','fats','carbs',
               ],
