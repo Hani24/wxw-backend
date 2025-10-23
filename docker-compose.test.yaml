@@ -1,0 +1,36 @@
+version: '3.4'
+services:
+  morris_armstrong_ii_api_server_test:
+    container_name: "M-A-${NODE_ENV}"
+    hostname: "M-A-${NODE_ENV}"
+    network_mode: host
+    restart: always
+    user: "node"
+    environment:
+      NODE_ENV: "${NODE_ENV}"
+      NODE_TYPE_T: "${NODE_TYPE_T}"
+    build:
+      context: ./
+      dockerfile: ./docker-common/envs/${NODE_ENV}/Dockerfile.sh
+      args:
+        NODE_ENV: "${NODE_ENV}"
+        NODE_TYPE_T: "${NODE_TYPE_T}"
+    volumes:
+      - type: bind
+        source: ./app-runtime
+        target: /home/node/server.api/app-runtime
+      - type: bind
+        source: ./pm2
+        target: /home/node/server.api/pm2
+      - type: bind
+        source: ./logs
+        target: /home/node/server.api/logs
+      - type: bind
+        source: ./docker-common/_.bash_aliases
+        target: /home/node/.bash_aliases
+      - type: bind
+        source: ./docker-common/_.bash_history
+        target: /home/node/.bash_history
+      - type: bind
+        source: ./docker-common/_.bashrc
+        target: /home/node/.bashrc
