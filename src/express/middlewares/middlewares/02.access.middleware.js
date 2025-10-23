@@ -130,7 +130,8 @@ module.exports = ( App, express, name )=>{
 
         // Block access to sensitive endpoints for guests
         const guestBlockedPaths = [
-          /^\/private\/client\/payment/,
+          // Payment settings are now allowed for guests to support guest checkout
+          // /^\/private\/client\/payment/,  // REMOVED: Allow payment settings for guests
           /^\/private\/client\/favorite/,
           /^\/private\/client\/courier\/create/,
         ];

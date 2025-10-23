@@ -28,50 +28,18 @@ module.exports = function(App, RPath){
       const paymentCardId = req.getCommonDataInt('paymentCardId', null);
       const type = req.getCommonDataString('type', null);
       const paymentTypes = App.getModel('OrderPaymentType').getTypes();
- 
+
       // console.json({ paymentCardId, type });
       // console.debug({ paymentTypes });
 
       // Auto-creates ClientPaymentSettings if it doesn't exist
+      // Note: payment-settings/get handles platform detection on first call
       let mClientPaymentSettings = await App.getModel('ClientPaymentSettings')
-        .getByClientId( mClient.id );
+        .getByClientId(mClient.id);
 
       // This should never happen as getByClientId auto-creates, but handle gracefully
       if( !App.isObject(mClientPaymentSettings) || !App.isPosNumber(mClientPaymentSettings.id) ){
-        // Fallback: try to create manually with a valid payment type
-
-        // Detect platform from request headers or user agent
-        const userAgent = (req.headers['user-agent'] || '').toLowerCase();
-        const osVersion = req.getCommonDataString('osVersion', '').toLowerCase();
-        const platform = req.getCommonDataString('platform', '').toLowerCase();
-
-        // Determine best payment type based on platform
-        let defaultType = paymentTypes.Card; // Fallback
-
-        if(osVersion.includes('ios') || platform.includes('ios') || userAgent.includes('iphone') || userAgent.includes('ipad')){
-          // iOS device - prefer ApplePay
-          defaultType = paymentTypes.ApplePay;
-        } else if(osVersion.includes('android') || platform.includes('android') || userAgent.includes('android')){
-          // Android device - prefer GooglePay
-          defaultType = paymentTypes.GooglePay;
-        } else if(paymentTypes.ApplePay){
-          // Unknown platform - default to ApplePay if available
-          defaultType = paymentTypes.ApplePay;
-        }
-
-        try{
-          const newSettings = await App.getModel('ClientPaymentSettings').create({
-            clientId: mClient.id,
-            type: defaultType // Use platform-specific payment type
-          });
-          if(!App.isObject(newSettings) || !App.isPosNumber(newSettings.id)){
-            return App.json( res, 500, App.t(['failed', 'to', 'create', 'payment-settings'], req.lang) );
-          }
-          mClientPaymentSettings = newSettings;
-        }catch(err){
-          console.error('Error creating ClientPaymentSettings:', err);
-          return App.json( res, 500, App.t(['failed', 'to', 'create', 'payment-settings'], req.lang) );
-        }
+        return App.json( res, 500, App.t(['failed', 'to', 'get', 'payment-settings'], req.lang) );
       }
 
 

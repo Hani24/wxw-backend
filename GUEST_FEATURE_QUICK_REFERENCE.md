@@ -106,7 +106,6 @@ await fetch('/public/guest/checkout/complete', {
 | Token Length | 32 chars | Model |
 
 ### Blocked Endpoints for Guests
-- `/private/client/payment/*`
 - `/private/client/favorite/*`
 - `/private/client/courier/create`
 
