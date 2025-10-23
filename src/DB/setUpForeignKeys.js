@@ -37,6 +37,10 @@ module.exports = async(App, params={})=>{
   const OrderDeliveryAddress = App.getModel('OrderDeliveryAddress');
   const OrderDeliveryTime = App.getModel('OrderDeliveryTime');
   const OrderDeliveryType = App.getModel('OrderDeliveryType');
+  const OrderOnSitePresenceDetails = App.getModel('OrderOnSitePresenceDetails');
+
+  const RestaurantOrderTypeSettings = App.getModel('RestaurantOrderTypeSettings');
+  const RestaurantUnavailableDates = App.getModel('RestaurantUnavailableDates');
 
   const Cart = App.getModel('Cart');
   const CartItem = App.getModel('CartItem');
@@ -227,6 +231,15 @@ module.exports = async(App, params={})=>{
 
   OrderDeliveryType.belongsTo(Order, {foreignKey: 'orderId'});
   Order.hasOne(OrderDeliveryType, {foreignKey: 'orderId'});
+
+  OrderOnSitePresenceDetails.belongsTo(Order, {foreignKey: 'orderId'});
+  Order.hasOne(OrderOnSitePresenceDetails, {foreignKey: 'orderId'});
+
+  RestaurantOrderTypeSettings.belongsTo(Restaurant, {foreignKey: 'restaurantId'});
+  Restaurant.hasMany(RestaurantOrderTypeSettings, {foreignKey: 'restaurantId'});
+
+  RestaurantUnavailableDates.belongsTo(Restaurant, {foreignKey: 'restaurantId'});
+  Restaurant.hasMany(RestaurantUnavailableDates, {foreignKey: 'restaurantId'});
 
   ClientPaymentSettings.belongsTo(User, { foreignKey: 'clientId' } );
   User.hasMany(ClientPaymentSettings, { foreignKey: 'clientId' } );

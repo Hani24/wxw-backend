@@ -24,6 +24,8 @@ module.exports = function(App, RPath){
         isOpen: App.getBooleanFromValue(data.isOpen) || null,
         type: req.getCommonDataString('type', null),
         name: App.tools.stripSpecialChars(req.getCommonDataString('name', '')).substr(0, 64),
+        orderType: req.getCommonDataString('orderType', 'order-now'), // Default to order-now
+        eventDate: req.getCommonDataString('eventDate', null), // For on-site presence filtering
       };
       console.json({filters});
       
@@ -34,7 +36,13 @@ module.exports = function(App, RPath){
         restaurantWhere['type'] = filters.type;
       if(App.isString(filters.name) && filters.name.length >= 1)
         restaurantWhere['name'] = { [App.DB.Op.like]: `%${filters.name}%` };
-      
+
+      // Validate order type
+      const orderTypes = App.getModel('Order').getOrderTypes({asArray: true});
+      if(!orderTypes.includes(filters.orderType)) {
+        filters.orderType = 'order-now'; // Fallback to default
+      }
+
       console.json({mUser});
       console.json({mClient});
       
@@ -90,34 +98,42 @@ module.exports = function(App, RPath){
         
         // Execute a raw SQL query to find restaurants within radius
         const [restaurants] = await App.DB.sequelize.query(`
-          SELECT 
+          SELECT
             r.id, r.name, r.image, r.zip, r.street,
             r.rating, r.type, r.lat, r.lon, r.isOpen,
             (
               3959 * acos(
-                cos(radians(${searchCoords.lat})) * 
-                cos(radians(r.lat)) * 
-                cos(radians(r.lon) - radians(${searchCoords.lon})) + 
-                sin(radians(${searchCoords.lat})) * 
+                cos(radians(${searchCoords.lat})) *
+                cos(radians(r.lat)) *
+                cos(radians(r.lon) - radians(${searchCoords.lon})) +
+                sin(radians(${searchCoords.lat})) *
                 sin(radians(r.lat))
               )
             ) AS calculatedDistance
-          FROM 
+          FROM
             Restaurants r
-          WHERE 
+          INNER JOIN RestaurantOrderTypeSettings rots ON rots.restaurantId = r.id
+          WHERE
             r.isVerified = true
             AND r.isRestricted = false
             AND r.isOpeningHoursSet = true
             AND r.isKycCompleted = true
+            AND rots.orderType = '${filters.orderType}'
+            AND rots.isEnabled = true
             ${App.isBoolean(filters.isOpen) && filters.isOpen ? 'AND r.isOpen = true' : ''}
             ${App.isString(filters.type) && restaurantTypes.includes(filters.type) ? `AND r.type = '${filters.type}'` : ''}
             ${App.isString(filters.name) && filters.name.length >= 1 ? `AND r.name LIKE '%${filters.name}%'` : ''}
+            ${filters.eventDate ? `AND NOT EXISTS (
+              SELECT 1 FROM RestaurantUnavailableDates rud
+              WHERE rud.restaurantId = r.id
+                AND rud.unavailableDate = '${filters.eventDate}'
+            )` : ''}
             AND (
               3959 * acos(
-                cos(radians(${searchCoords.lat})) * 
-                cos(radians(r.lat)) * 
-                cos(radians(r.lon) - radians(${searchCoords.lon})) + 
-                sin(radians(${searchCoords.lat})) * 
+                cos(radians(${searchCoords.lat})) *
+                cos(radians(r.lat)) *
+                cos(radians(r.lon) - radians(${searchCoords.lon})) +
+                sin(radians(${searchCoords.lat})) *
                 sin(radians(r.lat))
               )
             ) <= ${radiusInMiles}
@@ -139,22 +155,30 @@ module.exports = function(App, RPath){
         // Get total count using a separate query
         const [countResult] = await App.DB.sequelize.query(`
           SELECT COUNT(*) as total
-          FROM 
+          FROM
             Restaurants r
-          WHERE 
+          INNER JOIN RestaurantOrderTypeSettings rots ON rots.restaurantId = r.id
+          WHERE
             r.isVerified = true
             AND r.isRestricted = false
             AND r.isOpeningHoursSet = true
             AND r.isKycCompleted = true
+            AND rots.orderType = '${filters.orderType}'
+            AND rots.isEnabled = true
             ${App.isBoolean(filters.isOpen) && filters.isOpen ? 'AND r.isOpen = true' : ''}
             ${App.isString(filters.type) && restaurantTypes.includes(filters.type) ? `AND r.type = '${filters.type}'` : ''}
             ${App.isString(filters.name) && filters.name.length >= 1 ? `AND r.name LIKE '%${filters.name}%'` : ''}
+            ${filters.eventDate ? `AND NOT EXISTS (
+              SELECT 1 FROM RestaurantUnavailableDates rud
+              WHERE rud.restaurantId = r.id
+                AND rud.unavailableDate = '${filters.eventDate}'
+            )` : ''}
             AND (
               3959 * acos(
-                cos(radians(${searchCoords.lat})) * 
-                cos(radians(r.lat)) * 
-                cos(radians(r.lon) - radians(${searchCoords.lon})) + 
-                sin(radians(${searchCoords.lat})) * 
+                cos(radians(${searchCoords.lat})) *
+                cos(radians(r.lat)) *
+                cos(radians(r.lon) - radians(${searchCoords.lon})) +
+                sin(radians(${searchCoords.lat})) *
                 sin(radians(r.lat))
               )
             ) <= ${radiusInMiles}
@@ -198,6 +222,29 @@ module.exports = function(App, RPath){
             ORDER BY ct.order ASC
           `);
 
+          // Query order type settings for this restaurant
+          const [orderTypeSettings] = await App.DB.sequelize.query(`
+            SELECT orderType, isEnabled, pricingModel, pricePerPerson, pricePerHour, basePrice
+            FROM RestaurantOrderTypeSettings
+            WHERE restaurantId = ${restaurant.id}
+            AND isEnabled = true
+          `);
+
+          // Query unavailable dates for this restaurant (next 90 days)
+          const today = new Date().toISOString().split('T')[0];
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + 90);
+          const maxDate = futureDate.toISOString().split('T')[0];
+
+          const [unavailableDates] = await App.DB.sequelize.query(`
+            SELECT unavailableDate, reason
+            FROM RestaurantUnavailableDates
+            WHERE restaurantId = ${restaurant.id}
+            AND unavailableDate >= '${today}'
+            AND unavailableDate <= '${maxDate}'
+            ORDER BY unavailableDate ASC
+          `);
+
           // Format restaurant with S3 URL and proper distance format
           const formattedRestaurant = {
             image: App.S3.getUrlByName(restaurant.image),
@@ -218,6 +265,17 @@ module.exports = function(App, RPath){
               slug: ct.slug,
               description: ct.description,
               image: ct.image ? App.S3.getUrlByName(ct.image) : ''
+            })),
+            supportedOrderTypes: orderTypeSettings.map(ots => ({
+              orderType: ots.orderType,
+              pricingModel: ots.pricingModel,
+              pricePerPerson: ots.pricePerPerson ? parseFloat(ots.pricePerPerson) : null,
+              pricePerHour: ots.pricePerHour ? parseFloat(ots.pricePerHour) : null,
+              basePrice: ots.basePrice ? parseFloat(ots.basePrice) : null,
+            })),
+            unavailableDates: unavailableDates.map(ud => ({
+              date: ud.unavailableDate,
+              reason: ud.reason || null,
             })),
             distance: parseFloat(restaurant.calculatedDistance.toFixed(2)),
             distanceType: "mile"
@@ -242,6 +300,15 @@ module.exports = function(App, RPath){
             'rating', 'type', 'lat', 'lon', 'isOpen', 'shareableLink'
           ],
           include: [
+            {
+              required: true,
+              model: App.getModel('RestaurantOrderTypeSettings'),
+              where: {
+                orderType: filters.orderType,
+                isEnabled: true,
+              },
+              attributes: [],
+            },
             {
               required: true,
               model: App.getModel('MenuCategory'),
@@ -272,17 +339,71 @@ module.exports = function(App, RPath){
           limit: limit,
         });
 
-        // Initialize distance fields and format image URLs
+        // Filter by event date if provided (post-query filtering for Sequelize)
+        if(filters.eventDate && App.isArray(mRestaurants.rows)) {
+          const filteredRows = [];
+          for(const restaurant of mRestaurants.rows) {
+            const isAvailable = await App.getModel('RestaurantUnavailableDates').isDateAvailable(restaurant.id, filters.eventDate);
+            if(isAvailable) {
+              filteredRows.push(restaurant);
+            }
+          }
+          mRestaurants.rows = filteredRows;
+          mRestaurants.count = filteredRows.length;
+        }
+
+        // Initialize distance fields, format image URLs, and add order type settings
         if(App.isArray(mRestaurants.rows) && mRestaurants.rows.length) {
           for(const mRestaurant of mRestaurants.rows) {
             if(App.isObject(mRestaurant) && App.isPosNumber(mRestaurant.id)) {
               // Format image URL
               mRestaurant.image = App.S3.getUrlByName(mRestaurant.image);
-              
+
+              // Get order type settings for this restaurant
+              const orderTypeSettings = await App.getModel('RestaurantOrderTypeSettings').findAll({
+                where: {
+                  restaurantId: mRestaurant.id,
+                  isEnabled: true,
+                },
+                attributes: ['orderType', 'pricingModel', 'pricePerPerson', 'pricePerHour', 'basePrice'],
+              });
+
+              // Add supported order types to restaurant data
+              mRestaurant.dataValues.supportedOrderTypes = orderTypeSettings.map(ots => ({
+                orderType: ots.orderType,
+                pricingModel: ots.pricingModel,
+                pricePerPerson: ots.pricePerPerson ? parseFloat(ots.pricePerPerson) : null,
+                pricePerHour: ots.pricePerHour ? parseFloat(ots.pricePerHour) : null,
+                basePrice: ots.basePrice ? parseFloat(ots.basePrice) : null,
+              }));
+
+              // Get unavailable dates for this restaurant (next 90 days)
+              const today = new Date().toISOString().split('T')[0];
+              const futureDate = new Date();
+              futureDate.setDate(futureDate.getDate() + 90);
+              const maxDate = futureDate.toISOString().split('T')[0];
+
+              const unavailableDates = await App.getModel('RestaurantUnavailableDates').findAll({
+                where: {
+                  restaurantId: mRestaurant.id,
+                  unavailableDate: {
+                    [App.DB.Op.between]: [today, maxDate]
+                  }
+                },
+                attributes: ['unavailableDate', 'reason'],
+                order: [['unavailableDate', 'ASC']],
+              });
+
+              // Add unavailable dates to restaurant data
+              mRestaurant.dataValues.unavailableDates = unavailableDates.map(ud => ({
+                date: ud.unavailableDate,
+                reason: ud.reason || null,
+              }));
+
               // Initialize distance values
               mRestaurant.dataValues.distance = 0;
               mRestaurant.dataValues.distanceType = 'mile';
-              
+
               // Calculate distance if user coordinates are available
               if(searchCoords && searchCoords.lat && searchCoords.lon) {
                 const distRes = App.geo.lib.getDistance(searchCoords, mRestaurant, mDeliveryPriceSettings.unitType);

@@ -6,6 +6,7 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
 
   const ORDER_STATUSES = App.getDictByName('ORDER_STATUSES');
   const DISTANCE_UNITS = App.getDictByName('DISTANCE_UNITS');
+  const ORDER_TYPES = App.getDictByName('ORDER_TYPES');
 
   const Model = sequelize.define( exportModelWithName, {
     clientId: {
@@ -45,6 +46,13 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     status: {
       type: Sequelize.ENUM, required: true, values: ORDER_STATUSES,
       defaultValue: ORDER_STATUSES[ 0 ],
+    },
+    orderType: {
+      type: Sequelize.ENUM,
+      required: false, // Optional - defaults to 'order-now' for backward compatibility
+      allowNull: false, // Cannot be null, but has default
+      values: ORDER_TYPES,
+      defaultValue: ORDER_TYPES[0], // 'order-now'
     },
     totalPrice: { // all menu items from all restaurants
       type: DataTypes.DECIMAL(8,2).UNSIGNED, allowNull: false, defaultValue: 0
@@ -223,11 +231,24 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       }
     },
     isValidChecksum: {
-      type: DataTypes.VIRTUAL, 
+      type: DataTypes.VIRTUAL,
       get(){
         return ( App.isPosNumber(this.getDataValue('id')) )
           ? Model.getChecksum(this) === this.getDataValue('checksum')
           : false;
+      }
+    },
+    // Virtual fields for order type checking
+    isOrderNow: {
+      type: DataTypes.VIRTUAL,
+      get(){
+        return this.getDataValue('orderType') === ORDER_TYPES[0]; // 'order-now'
+      }
+    },
+    isOnSitePresence: {
+      type: DataTypes.VIRTUAL,
+      get(){
+        return this.getDataValue('orderType') === ORDER_TYPES[1]; // 'on-site-presence'
       }
     },
   }, {
@@ -253,6 +274,10 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
 
   Model.getStatuses = function ({asArray=false}={}) {
     return Model._mapDict(ORDER_STATUSES, {asArray} );
+  };
+
+  Model.getOrderTypes = function ({asArray=false}={}) {
+    return Model._mapDict(ORDER_TYPES, {asArray} );
   };
 
   Model.getDefaultMaxAgeOfOrder = function ({amount=30, of='minutes',format=App.getDateFormat()}={}) {

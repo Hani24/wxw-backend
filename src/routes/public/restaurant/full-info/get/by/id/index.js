@@ -105,6 +105,62 @@ module.exports = function (App, RPath) {
       const mWorkingTime = await App.getModel('RestaurantWorkingTime')
         .getAsObjectByRestaurantId(mRestaurant.id);
 
+      // Get order type settings for the restaurant
+      const orderTypeSettings = await App.getModel('RestaurantOrderTypeSettings').findAll({
+        where: {
+          restaurantId: mRestaurant.id,
+          isEnabled: true,
+        },
+        attributes: [
+          'id', 'orderType', 'isEnabled', 'pricingModel',
+          'basePrice', 'pricePerPerson', 'pricePerHour',
+          'minPeople', 'maxPeople', 'minHours', 'maxHours',
+          'serviceFeePercentage'
+        ],
+        order: [['orderType', 'ASC']]
+      });
+
+      // Get unavailable dates (next 90 days)
+      const today = new Date().toISOString().split('T')[0];
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 90);
+      const maxDate = futureDate.toISOString().split('T')[0];
+
+      const unavailableDates = await App.getModel('RestaurantUnavailableDates').findAll({
+        where: {
+          restaurantId: mRestaurant.id,
+          unavailableDate: {
+            [App.DB.Op.gte]: today,
+            [App.DB.Op.lte]: maxDate,
+          }
+        },
+        attributes: ['id', 'unavailableDate', 'reason', 'isFullDayBlocked', 'blockedFromTime', 'blockedToTime'],
+        order: [['unavailableDate', 'ASC']]
+      });
+
+      // Format order type settings
+      const supportedOrderTypes = orderTypeSettings.map(setting => ({
+        orderType: setting.orderType,
+        pricingModel: setting.pricingModel || null,
+        basePrice: setting.basePrice ? parseFloat(setting.basePrice) : null,
+        pricePerPerson: setting.pricePerPerson ? parseFloat(setting.pricePerPerson) : null,
+        pricePerHour: setting.pricePerHour ? parseFloat(setting.pricePerHour) : null,
+        minPeople: setting.minPeople || null,
+        maxPeople: setting.maxPeople || null,
+        minHours: setting.minHours || null,
+        maxHours: setting.maxHours || null,
+        serviceFeePercentage: setting.serviceFeePercentage ? parseFloat(setting.serviceFeePercentage) : null,
+      }));
+
+      // Format unavailable dates
+      const formattedUnavailableDates = unavailableDates.map(date => ({
+        date: date.unavailableDate,
+        reason: date.reason || null,
+        isFullDayBlocked: date.isFullDayBlocked,
+        blockedFromTime: date.blockedFromTime || null,
+        blockedToTime: date.blockedToTime || null,
+      }));
+
       // Get menu categories and items
       // Set up includes for menu items
       const includeMenuItem = [];
@@ -185,7 +241,9 @@ module.exports = function (App, RPath) {
       App.json(res, true, App.t(['success'], res.lang), {
         info: mRestaurant,
         workingTime: mWorkingTime,
-	MenuCategories: processedMenuCategories,
+        supportedOrderTypes: supportedOrderTypes,
+        unavailableDates: formattedUnavailableDates,
+        MenuCategories: processedMenuCategories,
       });
 
     } catch (e) {

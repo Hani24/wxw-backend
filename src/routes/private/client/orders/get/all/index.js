@@ -17,20 +17,31 @@ module.exports = function(App, RPath) {
       const orderBy = App.getModel('Order').getOrderBy(by);
       const statuses = App.getModel('Order').getStatuses();
 
+      // Allow filtering by status (optional)
+      const statusFilter = req.getCommonDataString('status', null);
+      let statusCondition = {
+        [App.DB.Op.or]: [
+          statuses['created'], // Include created orders (default status for new orders)
+          statuses['processing'],
+          statuses['delivered'],
+          statuses['refunded'],
+          statuses['canceled'], // Include canceled orders
+        ]
+      };
+
+      // If specific status requested, filter by that
+      if(statusFilter && statuses[statusFilter]) {
+        statusCondition = statuses[statusFilter];
+      }
+
       const mOrders = await App.getModel('Order').findAndCountAll({
         where: {
           clientId: mClient.id,
-          status: {
-            [App.DB.Op.or]: [
-              statuses['processing'],
-              statuses['delivered'],
-              statuses['refunded'],
-            ]
-          },
+          status: statusCondition,
         },
         distinct: true,
         attributes: [
-          'id', 'status', 'totalItems', 'totalPrice', 'finalPrice', 'deliveryPrice',
+          'id', 'status', 'orderType', 'totalItems', 'totalPrice', 'finalPrice', 'deliveryPrice',
           'discountAmount', 'discountCode',
           'isPaid', 'isRefunded',
           'isOrderRatedByClient', 'isPaymentRequested',
@@ -45,18 +56,18 @@ module.exports = function(App, RPath) {
         include: [
           {
             model: App.getModel('OrderDeliveryTime'),
-            required: true,
+            required: false, // Optional - not needed for on-site presence orders
             attributes: [
               'id', 'deliveryDay', 'deliveryHour', 'deliveryTimeValue', 'deliveryTimeType'
             ],
           },
           {
             model: App.getModel('OrderDeliveryAddress'),
-            required: true,
+            required: false, // Optional - not needed for on-site presence orders
             attributes: ['id'],
             include: [{
               model: App.getModel('DeliveryAddress'),
-              required: true,
+              required: false,
               attributes: ['id', 'stateId', 'city', 'street', 'apartment'],
               include: [{
                 model: App.getModel('State'),
@@ -66,7 +77,7 @@ module.exports = function(App, RPath) {
           },
           {
             model: App.getModel('OrderPaymentType'),
-            required: true,
+            required: false, // Optional - may not exist for on-site presence orders yet
             attributes: ['id', 'type', 'paymentCardId'], // Include 'paymentCardId' here
             include: [{
               model: App.getModel('PaymentCard'),
@@ -87,6 +98,17 @@ module.exports = function(App, RPath) {
               model: App.getModel('Restaurant'),
               attributes: ['id', 'name']
             }]
+          },
+          {
+            required: false, // Optional - only for on-site presence orders
+            model: App.getModel('OrderOnSitePresenceDetails'),
+            attributes: [
+              'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+              'numberOfPeople', 'numberOfHours', 'specialRequests',
+              'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+              'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+              'acceptanceDeadline',
+            ],
           }
         ],
         order: [[orderBy, order]],
@@ -95,29 +117,45 @@ module.exports = function(App, RPath) {
       });
 
       for (const mOrder of mOrders.rows) {
-        // Get human-readable delivery time
-        mOrder.dataValues.deliveryTime = App.getModel('OrderDeliveryTime')
-          .getHumanTimeFromObject(mOrder.OrderDeliveryTime);
+        // Get human-readable delivery time (only for order-now orders)
+        if (mOrder.OrderDeliveryTime) {
+          mOrder.dataValues.deliveryTime = App.getModel('OrderDeliveryTime')
+            .getHumanTimeFromObject(mOrder.OrderDeliveryTime);
+        } else {
+          mOrder.dataValues.deliveryTime = null;
+        }
 
-        // Construct delivery address
-        const mDeliveryAddress = mOrder.OrderDeliveryAddress.DeliveryAddress;
-        mOrder.dataValues.stateId = mDeliveryAddress.State.id;
-        mOrder.dataValues.deliveryAddress = `${mDeliveryAddress.State.name}, ${mDeliveryAddress.city}, ${mDeliveryAddress.street}`
-          + (mDeliveryAddress.apartment ? ` / ${mDeliveryAddress.apartment}` : '');
+        // Construct delivery address (only for order-now orders)
+        if (mOrder.OrderDeliveryAddress && mOrder.OrderDeliveryAddress.DeliveryAddress) {
+          const mDeliveryAddress = mOrder.OrderDeliveryAddress.DeliveryAddress;
+          mOrder.dataValues.stateId = mDeliveryAddress.State ? mDeliveryAddress.State.id : null;
+          mOrder.dataValues.deliveryAddress = mDeliveryAddress.State
+            ? `${mDeliveryAddress.State.name}, ${mDeliveryAddress.city}, ${mDeliveryAddress.street}`
+              + (mDeliveryAddress.apartment ? ` / ${mDeliveryAddress.apartment}` : '')
+            : null;
+        } else {
+          mOrder.dataValues.stateId = null;
+          mOrder.dataValues.deliveryAddress = null;
+        }
 
-        // Process payment type
-        if (mOrder.OrderPaymentType.type !== App.getModel('OrderPaymentType').getTypes().Card) {
-          mOrder.dataValues.paymentType = mOrder.OrderPaymentType.type;
-        } else if (mOrder.OrderPaymentType.PaymentCard) {
-          const decCardNumberRes = App.RSA.decrypt(mOrder.OrderPaymentType.PaymentCard.encCardNumber);
-          if (!decCardNumberRes.success) {
-            mOrder.dataValues.paymentType = `n/a`;
+        // Process payment type (may not exist for on-site presence orders)
+        if (mOrder.OrderPaymentType) {
+          if (mOrder.OrderPaymentType.type !== App.getModel('OrderPaymentType').getTypes().Card) {
+            mOrder.dataValues.paymentType = mOrder.OrderPaymentType.type;
+          } else if (mOrder.OrderPaymentType.PaymentCard) {
+            const decCardNumberRes = App.RSA.decrypt(mOrder.OrderPaymentType.PaymentCard.encCardNumber);
+            if (!decCardNumberRes.success) {
+              mOrder.dataValues.paymentType = `n/a`;
+            } else {
+              const lastDigits = decCardNumberRes.data.substr(decCardNumberRes.data.length - 4);
+              mOrder.dataValues.paymentType = `Card: **** ${lastDigits}`;
+            }
           } else {
-            const lastDigits = decCardNumberRes.data.substr(decCardNumberRes.data.length - 4);
-            mOrder.dataValues.paymentType = `Card: **** ${lastDigits}`;
+            mOrder.dataValues.paymentType = `n/a`;
           }
         } else {
-          mOrder.dataValues.paymentType = `n/a`;
+          // No payment type set yet (common for on-site presence orders)
+          mOrder.dataValues.paymentType = null;
         }
 
         // Add isOrderReady and orderReadyAt
@@ -142,11 +180,33 @@ module.exports = function(App, RPath) {
           cancelReason: supplier.cancellationReason
         })) : [];
 
+        // Add on-site presence details if this is an on-site presence order
+        const orderTypes = App.getModel('Order').getOrderTypes();
+        if (mOrder.orderType === orderTypes['on-site-presence'] && mOrder.OrderOnSitePresenceDetail) {
+          const details = mOrder.OrderOnSitePresenceDetail;
+          mOrder.dataValues.onSitePresenceDetails = {
+            eventDate: details.eventDate,
+            eventStartTime: details.eventStartTime || null,
+            eventEndTime: details.eventEndTime || null,
+            numberOfPeople: details.numberOfPeople,
+            numberOfHours: details.numberOfHours,
+            specialRequests: details.specialRequests || null,
+            estimatedBasePrice: details.estimatedBasePrice ? parseFloat(details.estimatedBasePrice) : null,
+            estimatedServiceFee: details.estimatedServiceFee ? parseFloat(details.estimatedServiceFee) : null,
+            estimatedTotalPrice: details.estimatedTotalPrice ? parseFloat(details.estimatedTotalPrice) : null,
+            restaurantAcceptedAt: details.restaurantAcceptedAt || null,
+            restaurantRejectedAt: details.restaurantRejectedAt || null,
+            rejectionReason: details.rejectionReason || null,
+            acceptanceDeadline: details.acceptanceDeadline || null,
+          };
+        }
+
         // Remove unnecessary properties
         delete mOrder.dataValues.OrderPaymentType;
         delete mOrder.dataValues.OrderDeliveryTime;
         delete mOrder.dataValues.OrderDeliveryAddress;
         delete mOrder.dataValues.OrderSuppliers;
+        delete mOrder.dataValues.OrderOnSitePresenceDetail;
       }
 
       App.json(res, true, App.t('success', res.lang), mOrders);
