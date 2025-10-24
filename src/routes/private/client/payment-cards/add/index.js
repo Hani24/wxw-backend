@@ -143,6 +143,43 @@ module.exports = function (App, RPath) {
 
 
       {
+        // Create Stripe customer if not exists (for guest users or users without customerId)
+        if (!mClient.customerId) {
+          const customerCreateRes = await App.payments.stripe.customerCreate({
+            email: mUser.email || null,
+            phone: mUser.phone || null,
+            name: `${mUser.firstName || ''} ${mUser.lastName || ''}`.trim() || null,
+            metadata: {
+              clientId: mClient.id,
+              userId: mUser.id,
+              isGuest: mUser.isGuest || false,
+            }
+          });
+
+          if (!customerCreateRes.success) {
+            App.logger.fatal(`#customerCreate`, { customerCreateRes });
+            console.error(`#customerCreate`);
+            console.json({ customerCreateRes });
+            await mPaymentCard.update({ isDeleted: true });
+            return App.json(res, 417, App.t(['failed-to', 'create', 'stripe', 'customer'], res.lang));
+          }
+
+          // Update client with Stripe customerId
+          const updateClientRes = await mClient.update({
+            customerId: customerCreateRes.data.id
+          });
+
+          if (!App.isObject(updateClientRes) || !updateClientRes.customerId) {
+            App.logger.fatal(`#updateClient.customerId`, { updateClientRes });
+            console.error(`#updateClient.customerId failed`);
+            await mPaymentCard.update({ isDeleted: true });
+            return App.json(res, 417, App.t(['failed-to', 'update', 'client', 'with', 'stripe', 'customer'], res.lang));
+          }
+
+          // Update local reference
+          mClient.customerId = customerCreateRes.data.id;
+        }
+
         // Create and Attach Local-Card to Customer.id
         const paymentMethodCreateRes = await App.payments.stripe.paymentMethodCardCreate({
           // name: decPaymentCard_t.cardHolderName,
