@@ -133,10 +133,12 @@ module.exports = function(App, RPath) {
             return App.json(res, 417, App.t(['email', 'is-not', 'valid'], req.lang));
           }
 
-          // Check if email already exists (excluding current guest user)
+          // Check if email already exists for NON-GUEST users only
+          // Allow multiple guest users to use the same email
           const existingEmailUser = await App.getModel('User').findOne({
             where: {
               email: cleanedEmail,
+              isGuest: false,  // Only check non-guest users
               id: {
                 [App.DB.Op.ne]: mGuestSession.userId
               }
@@ -145,7 +147,7 @@ module.exports = function(App, RPath) {
 
           if (App.isObject(existingEmailUser)) {
             await tx.rollback();
-            return App.json(res, 417, App.t(['email', 'already', 'registered'], req.lang));
+            return App.json(res, 417, App.t(['email', 'already', 'registered', 'please', 'login', 'or', 'use', 'different', 'email'], req.lang));
           }
 
           userUpdateData.email = cleanedEmail;
