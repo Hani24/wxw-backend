@@ -145,10 +145,26 @@ module.exports = function (App, RPath) {
       {
         // Create Stripe customer if not exists (for guest users or users without customerId)
         if (!mClient.customerId) {
+          // For guest users, use temporary email format
+          const customerEmail = mUser.isGuest
+            ? `guest_${mUser.id}@temporary.com`
+            : (mUser.email || `user_${mUser.id}@temporary.com`);
+
+          const customerName = mUser.isGuest
+            ? 'Guest User'
+            : (`${mUser.firstName || ''} ${mUser.lastName || ''}`.trim() || `User ${mUser.id}`);
+
+          // For phone: only include if it's a real phone (not temporary guest phone)
+          // Stripe phone must be valid format and max 20 chars
+          const customerPhone = mUser.isGuest
+            ? null  // Guest temp phones are invalid, skip them
+            : (mUser.phone && !mUser.phone.startsWith('guest_') ? mUser.phone : null);
+
           const customerCreateRes = await App.payments.stripe.customerCreate({
-            email: mUser.email || null,
-            phone: mUser.phone || null,
-            name: `${mUser.firstName || ''} ${mUser.lastName || ''}`.trim() || null,
+            email: customerEmail,
+            phone: customerPhone,
+            name: customerName,
+            description: mUser.isGuest ? 'Guest checkout user' : 'Customer',
             metadata: {
               clientId: mClient.id,
               userId: mUser.id,
