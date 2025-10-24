@@ -396,6 +396,25 @@ class StripePayment {
     }
   }
 
+  async paymentMethodGetById( paymentMethodId ){
+
+    try{
+
+      if( !this.isInited() )
+        return this._q(false, `${this.name}: is not inited` );
+
+      const paymentMethod = await this._stripe.paymentMethods.retrieve(
+        paymentMethodId
+      );
+
+      return this._q(true, 'success', paymentMethod);
+
+    }catch(e){
+      console.error(`paymentMethodGetById: ${e.message}`);
+      return this._q(false, e.message);
+    }
+  }
+
   async paymentMethodDetach( paymentMethodId ){
 
     try{

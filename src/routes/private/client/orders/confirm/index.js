@@ -226,8 +226,17 @@ module.exports = function(App, RPath){
           if( !App.isObject(mPaymentCard) || !App.isPosNumber(mPaymentCard.id) )
             return await App.json( res, 404, App.t(['Payment card not found'], req.lang) );
 
-          // Reload client to get the latest customerId (important for guest users who just added a card)
-          await mClient.reload();
+          // For guest users, get the customer ID directly from the payment method
+          // This ensures we use the correct customer ID that the payment method is attached to
+          if( mUser.isGuest ){
+            const paymentMethodRes = await App.payments.stripe.paymentMethodGetById(mPaymentCard.paymentMethodId);
+            if( !paymentMethodRes.success || !paymentMethodRes.data.customer ){
+              console.error(`Failed to get payment method or customer for guest: ${paymentMethodRes.message}`);
+              return await App.json( res, 417, App.t(['Payment method is not properly configured'], req.lang) );
+            }
+            // Override the customer ID with the one from the payment method
+            paymentIntentConfig.customer = paymentMethodRes.data.customer;
+          }
 
           paymentIntentConfig.payment_method_types = ['card'];
           paymentIntentConfig.payment_method = mPaymentCard.paymentMethodId;
@@ -418,7 +427,7 @@ module.exports = function(App, RPath){
       // [statistic]
       await mClient.update({
         // totalSpend: (mClient.totalSpend +mOrder.finalPrice),
-        totalOrders: (mClient.totalOrders +1),
+        totalOrders: (parseInt(mClient.totalOrders) || 0) + 1,
         // totalRejectedOrders: (mClient.totalRejectedOrders +1),
         // totalCanceledOrders: (mClient.totalCanceledOrders +1),
         // totalCompletedOrders: (mClient.totalCompletedOrders +1),
