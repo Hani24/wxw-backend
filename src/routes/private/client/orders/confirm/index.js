@@ -226,6 +226,9 @@ module.exports = function(App, RPath){
           if( !App.isObject(mPaymentCard) || !App.isPosNumber(mPaymentCard.id) )
             return await App.json( res, 404, App.t(['Payment card not found'], req.lang) );
 
+          // Reload client to get the latest customerId (important for guest users who just added a card)
+          await mClient.reload();
+
           paymentIntentConfig.payment_method_types = ['card'];
           paymentIntentConfig.payment_method = mPaymentCard.paymentMethodId;
           break;
