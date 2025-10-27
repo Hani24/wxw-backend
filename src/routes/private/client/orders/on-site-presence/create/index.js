@@ -80,11 +80,15 @@ module.exports = function(App, RPath){
       if(!isDateAvailable)
         return App.json(res, 417, App.t(['Selected date is not available for this restaurant'], req.lang));
 
-      // Check for existing active orders
+      // Check for existing unaccepted on-site presence orders for the same restaurant
       const statuses = App.getModel('Order').getStatuses();
-      const existingActiveOrder = await App.getModel('Order').findOne({
+      const orderTypes = App.getModel('Order').getOrderTypes();
+
+      // Find existing on-site presence orders that are not yet accepted
+      const existingUnacceptedOrder = await App.getModel('Order').findOne({
         where: {
           clientId: mClient.id,
+          orderType: orderTypes['on-site-presence'],
           status: {
             [App.DB.Op.or]: [
               statuses['created'],
@@ -92,11 +96,30 @@ module.exports = function(App, RPath){
             ]
           },
         },
-        attributes: ['id', 'status'],
+        include: [
+          {
+            model: App.getModel('OrderSupplier'),
+            where: {
+              restaurantId: restaurantId,
+              isAcceptedByRestaurant: false,  // Not yet accepted
+            },
+            attributes: ['restaurantId', 'isAcceptedByRestaurant'],
+          },
+          {
+            model: App.getModel('OrderOnSitePresenceDetails'),
+            where: {
+              restaurantAcceptedAt: null,  // Restaurant hasn't accepted yet
+            },
+            attributes: ['id', 'restaurantAcceptedAt'],
+            required: false,
+          }
+        ]
       });
 
-      if(existingActiveOrder) {
-        return App.json(res, 417, App.t(['You already have an active order. Please wait until it is completed before placing a new one.'], req.lang));
+      if(existingUnacceptedOrder) {
+        return App.json(res, 417, App.t([
+          'You already have a pending on-site presence order for this restaurant that has not been accepted yet. Please wait for the restaurant to respond before placing a new order.'
+        ], req.lang));
       }
 
       // Calculate price estimate
@@ -230,82 +253,22 @@ module.exports = function(App, RPath){
           }
         }
 
-        // Create payment intent
-        const paymentIntentConfig = {
-          receipt_email: mUser.email,
-          amount: Math.floor(estimatedTotalPrice * 100), // Convert to cents
-          customer: mClient.customerId,
-          description: `On-Site Presence Order: #${mOrder.id}`,
-          metadata: {
-            orderId: mOrder.id,
-            orderType: 'on-site-presence',
-            userId: mUser.id,
-            clientId: mClient.id,
-            restaurantId: restaurantId,
-            eventDate: eventDate,
-            numberOfPeople: numberOfPeople,
-            numberOfHours: numberOfHours,
-            finalPrice: estimatedTotalPrice,
-          }
-        };
+        // Update order checksum before commit
+        mOrder = await mOrder.update({ checksum: true }, { transaction: tx });
 
-        // Set payment method types based on payment settings
-        if(App.isObject(mClientPaymentSettings)) {
-          switch(mClientPaymentSettings.type) {
-            case paymentTypes.Card: {
-              const mPaymentCard = await App.getModel('PaymentCard').getById(mClientPaymentSettings.paymentCardId);
-              if(App.isObject(mPaymentCard) && App.isPosNumber(mPaymentCard.id)) {
-                paymentIntentConfig.payment_method_types = ['card'];
-                paymentIntentConfig.payment_method = mPaymentCard.paymentMethodId;
-              }
-              break;
-            }
-            case paymentTypes.GooglePay:
-            case paymentTypes.ApplePay: {
-              paymentIntentConfig.payment_method_types = ['card'];
-              break;
-            }
-          }
-        }
-
-        const paymentIntentRes = await App.payments.stripe.paymentIntentCreate(paymentIntentConfig);
-
-        if(!paymentIntentRes.success) {
-          console.error({paymentIntentRes});
+        if(!App.isObject(mOrder) || !App.isPosNumber(mOrder.id)) {
           await tx.rollback();
-          return App.json(res, 417, App.t(paymentIntentRes.message, req.lang));
+          return App.json(res, false, App.t(['Failed to finalize order'], req.lang));
         }
-
-        const paymentIntent = paymentIntentRes.data;
-        const paymentIntentId = paymentIntent.id;
-        const clientSecret = paymentIntent.client_secret;
-
-        // Update order with payment details
-        mOrder = await mOrder.update({
-          paymentIntentId,
-          clientSecret,
-          isPaid: (App.isEnv('dev')), // Auto-mark as paid in dev
-          paidAt: (App.isEnv('dev') ? App.getISODate() : null),
-          checksum: true,
-        }, { transaction: tx });
 
         await tx.commit();
 
-        // Return response
+        // Return response with order details (payment intent will be created in order/confirm)
         await App.json(res, true, App.t(['On-site presence order created successfully'], req.lang), {
-          orderId: mOrder.id,
-          orderType: 'on-site-presence',
+          id: mOrder.id,
           status: mOrder.status,
-          restaurantId: restaurantId,
-          restaurantName: mRestaurant.name,
-          eventDate: eventDate,
-          numberOfPeople: numberOfPeople,
-          numberOfHours: numberOfHours,
-          estimatedTotalPrice: estimatedTotalPrice,
-          acceptanceDeadline: acceptanceDeadline,
-          paymentIntentId: paymentIntentId,
-          clientSecret: clientSecret,
-          requiresPaymentAction: !mOrder.isPaid,
+          orderType: 'on-site-presence',
+          order: mOrder,
         });
 
         // Update client statistics

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // Get all users across all roles (root, admin, restaurant, employee, courier, client)
-// GET /private/admin/users/get/all/?offset=0&limit=15&order=desc&by=firstName&role=client
+// GET /private/admin/users/get/all/?offset=0&limit=15&order=desc&by=firstName&role=client&isGuest=true
 
 module.exports = function(App, RPath){
 
@@ -53,6 +53,11 @@ module.exports = function(App, RPath){
       // Optional: Filter by restricted status
       if (req.query['isRestricted'] !== undefined) {
         whereClause.isRestricted = req.query['isRestricted'] === 'true';
+      }
+
+      // Optional: Filter by guest status
+      if (req.query['isGuest'] !== undefined) {
+        whereClause.isGuest = req.query['isGuest'] === 'true';
       }
 
       // Optional: Search by name, email, or phone
@@ -164,6 +169,7 @@ module.exports = function(App, RPath){
         isEmailVerified: 'Filter by email verification: true or false',
         isPhoneVerified: 'Filter by phone verification: true or false',
         isRestricted: 'Filter by restricted status: true or false',
+        isGuest: 'Filter by guest status: true or false',
         search: 'Search by firstName, lastName, email, or phone',
       }
     }

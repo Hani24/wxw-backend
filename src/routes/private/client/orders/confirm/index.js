@@ -23,6 +23,7 @@ module.exports = function(App, RPath){
 
       const id = req.getCommonDataInt('id', null);
       const statuses = App.getModel('Order').getStatuses();
+      const orderTypes = App.getModel('Order').getOrderTypes();
       const paymentTypes = App.getModel('OrderPaymentType').getTypes();
 
       if( App.isNull(id) )
@@ -56,26 +57,8 @@ module.exports = function(App, RPath){
       if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
         return await App.json( res, 404, App.t(['Order not found'], req.lang) );
 
-      // Check if user already has an active order (excluding the current order being confirmed)
-      const existingActiveOrder = await App.getModel('Order').findOne({
-        where: {
-          clientId: mClient.id,
-          id: {
-            [App.DB.Op.ne]: id  // Not equal to current order
-          },
-          status: {
-            [App.DB.Op.or]: [
-              statuses['created'],
-              statuses['processing'],
-            ]
-          },
-        },
-        attributes: ['id', 'status'],
-      });
-
-      if (existingActiveOrder) {
-        return App.json(res, 417, App.t(['You already have an active order. Please wait until it is completed before placing a new one.'], req.lang));
-      }
+      // Note: Validation for duplicate orders is now done in create endpoints (orders/create and on-site-presence/create)
+      // This ensures users are informed early when creating the order, not when confirming it
 
       // if( !mOrder.isValidChecksum )
       //   return App.json( res, 403, App.t(['Order Security check error'], req.lang) );
@@ -135,39 +118,50 @@ module.exports = function(App, RPath){
 
       } // set from defaults
 
-      let mDeliveryAddress = await App.getModel('OrderDeliveryAddress').getByFields({ orderId: mOrder.id });
+      // Check if this is an on-site-presence order
+      const isOnSitePresence = mOrder.orderType === orderTypes['on-site-presence'];
 
-      // Try: Get && Add default Delivery-Address if: Client have not sent any Delivery-Address
-      if( !App.isObject(mDeliveryAddress) ){
+      // For regular orders (not on-site-presence), handle delivery address
+      if(!isOnSitePresence) {
+        let mDeliveryAddress = await App.getModel('OrderDeliveryAddress').getByFields({ orderId: mOrder.id });
 
-        mDeliveryAddress = await App.getModel('DeliveryAddress').findOne({
-          where: {
-            clientId: mClient.id,
-            // isOneTimeAddress: false,
-            isDefault: true,
-          }
-        });
+        // Try: Get && Add default Delivery-Address if: Client have not sent any Delivery-Address
+        if( !App.isObject(mDeliveryAddress) ){
 
-        if( !App.isObject(mDeliveryAddress) || !App.isPosNumber(mDeliveryAddress.id) )
-          return await App.json( res, 404, App.t(['Default delivery address not found'], req.lang) );
+          mDeliveryAddress = await App.getModel('DeliveryAddress').findOne({
+            where: {
+              clientId: mClient.id,
+              // isOneTimeAddress: false,
+              isDefault: true,
+            }
+          });
 
-        const mOrderDeliveryAddress = await App.getModel('OrderDeliveryAddress').create({
-          orderId: mOrder.id,
-          deliveryAddressId: mDeliveryAddress.id
-        });
+          if( !App.isObject(mDeliveryAddress) || !App.isPosNumber(mDeliveryAddress.id) )
+            return await App.json( res, 404, App.t(['Default delivery address not found'], req.lang) );
 
-        if( !App.isObject(mOrderDeliveryAddress) || !App.isPosNumber(mOrderDeliveryAddress.id) )
-          return await App.json( res, false, App.t(['Failed to create order delivery-address'], req.lang) );
+          const mOrderDeliveryAddress = await App.getModel('OrderDeliveryAddress').create({
+            orderId: mOrder.id,
+            deliveryAddressId: mDeliveryAddress.id
+          });
 
+          if( !App.isObject(mOrderDeliveryAddress) || !App.isPosNumber(mOrderDeliveryAddress.id) )
+            return await App.json( res, false, App.t(['Failed to create order delivery-address'], req.lang) );
+
+        }
       }
 
       // verify that user has set all required data for delivery and payment
-      const orderModels = [
-        { model: 'OrderDeliveryAddress', message: ['Please','select','delivery','address'/*,'is-required'*/] },
-        { model: 'OrderDeliveryTime', message: ['Please','select','delivery','time'/*,'is-required'*/] },
-        { model: 'OrderDeliveryType', message: ['Please','select','delivery','type'/*,'is-required'*/] },
-        { model: 'OrderPaymentType', message: ['Please','select','payment','type'/*,'is-required'*/] },
-      ];
+      // For on-site-presence orders, skip delivery-related validations
+      const orderModels = isOnSitePresence
+        ? [
+            { model: 'OrderPaymentType', message: ['Please','select','payment','type'/*,'is-required'*/] },
+          ]
+        : [
+            { model: 'OrderDeliveryAddress', message: ['Please','select','delivery','address'/*,'is-required'*/] },
+            { model: 'OrderDeliveryTime', message: ['Please','select','delivery','time'/*,'is-required'*/] },
+            { model: 'OrderDeliveryType', message: ['Please','select','delivery','type'/*,'is-required'*/] },
+            { model: 'OrderPaymentType', message: ['Please','select','payment','type'/*,'is-required'*/] },
+          ];
 
       for( const orderModel of orderModels ){
         if( !( await App.getModel( orderModel.model ).isset({ orderId: mOrder.id }) ) ){
@@ -287,6 +281,7 @@ module.exports = function(App, RPath){
       if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
         return await App.json( res, false, App.t(['Failed to update payment details'], req.lang) );
 
+      // Build order details response based on order type
       const orderDetails = {
         clientSecret,
         paymentIntentId,
@@ -306,6 +301,28 @@ module.exports = function(App, RPath){
           items: [],
         }
       };
+
+      // For on-site-presence orders, fetch and include event details
+      if(isOnSitePresence) {
+        const mOnSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
+        if(App.isObject(mOnSiteDetails) && App.isPosNumber(mOnSiteDetails.id)) {
+          orderDetails.order.onSitePresenceDetails = {
+            eventDate: mOnSiteDetails.eventDate,
+            eventStartTime: mOnSiteDetails.eventStartTime,
+            eventEndTime: mOnSiteDetails.eventEndTime,
+            numberOfPeople: mOnSiteDetails.numberOfPeople,
+            numberOfHours: mOnSiteDetails.numberOfHours,
+            specialRequests: mOnSiteDetails.specialRequests,
+            estimatedBasePrice: mOnSiteDetails.estimatedBasePrice,
+            estimatedServiceFee: mOnSiteDetails.estimatedServiceFee,
+            estimatedTotalPrice: mOnSiteDetails.estimatedTotalPrice,
+            acceptanceDeadline: mOnSiteDetails.acceptanceDeadline,
+            restaurantAcceptedAt: mOnSiteDetails.restaurantAcceptedAt,
+            restaurantRejectedAt: mOnSiteDetails.restaurantRejectedAt,
+            rejectionReason: mOnSiteDetails.rejectionReason,
+          };
+        }
+      }
 
       // new rule (13-jun-2022) try execute auto-payment if (payment-method == Card)
       if( mOrderPaymentType.type == paymentTypes.Card ){

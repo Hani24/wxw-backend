@@ -23,8 +23,21 @@ console.log("order create data: ", data);
       if ((await App.getModel('Cart').isCartEmptyByClientId(mClient.id)))
         return App.json(res, 417, App.t(['Cart', 'is-empty'], req.lang));
 
-      // Clean up any existing unpaid/unconfirmed orders before creating a new one
+      // Get restaurants from cart
+      let mRestaurants = await App.getModel('Cart').getPopulatedByClientId(mClient.id);
+      const cartRestaurantIds = mRestaurants.map(r => r.id);
+
+      // NEW REQUIREMENT: User can only order from ONE restaurant at a time
+      // Check if cart has items from multiple restaurants
+      if(cartRestaurantIds.length > 1) {
+        return App.json(res, 417, App.t([
+          'You can only order from one restaurant at a time. Please remove items from other restaurants before placing your order.'
+        ], req.lang));
+      }
+
       const statuses = App.getModel('Order').getStatuses();
+
+      // Clean up any existing unpaid/unconfirmed orders before creating a new one
       await App.getModel('Order').update(
         { status: statuses['discarded'] },
         {
@@ -46,7 +59,8 @@ console.log("order create data: ", data);
       if (!App.isObject(mDeliveryPriceSettings) || !App.isPosNumber(mDeliveryPriceSettings.id))
         return App.json(res, 417, App.t(['failed-to', 'get', 'system', 'settings'], req.lang));
 
-      let mRestaurants = await App.getModel('Cart').getPopulatedByClientId(mClient.id);
+      // Fetch updated restaurants after menu item checks
+      mRestaurants = await App.getModel('Cart').getPopulatedByClientId(mClient.id);
 
       const unavailableMenuItems = [];
       for (const mRestaurant of mRestaurants) {
