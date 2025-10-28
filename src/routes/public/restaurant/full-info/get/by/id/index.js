@@ -74,28 +74,44 @@ module.exports = function (App, RPath) {
      // }
 	  if (App.isObject(mUser) || (res.info.lat && res.info.lon)) {
   const mDeliveryPriceSettings = await App.getModel('DeliveryPriceSettings').getSettings();
-  
-  let deliveryCoords = { lat: mUser.lat, lon: mUser.lon }; // Default to user's coordinates
-  
-  const defaultAddress = await App.getModel('DeliveryAddress').findOne({
-    where: {
-      clientId: mClient.id,
-      isDefault: true,
-      isDeleted: false,
-    },
-  });
-  
-  if (defaultAddress) {
-    deliveryCoords = {
-      lat: defaultAddress.lat,
-      lon: defaultAddress.lon,
-    };
+
+  let deliveryCoords = null;
+
+  // Try to get delivery coordinates from default address if client exists
+  if (App.isObject(mClient) && App.isPosNumber(mClient.id)) {
+    const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+      where: {
+        clientId: mClient.id,
+        isDefault: true,
+        isDeleted: false,
+      },
+    });
+
+    if (defaultAddress) {
+      deliveryCoords = {
+        lat: defaultAddress.lat,
+        lon: defaultAddress.lon,
+      };
+    }
   }
-  
-  const distRes = App.geo.lib.getDistance(deliveryCoords, mRestaurant, mDeliveryPriceSettings.unitType || 'miles');
-  if (distRes.success) {
-    mRestaurant.dataValues.distance = distRes.data.distance;
-    mRestaurant.dataValues.distanceType = distRes.data.units;
+
+  // Fallback to user coordinates if no default address found
+  if (!deliveryCoords && App.isObject(mUser) && mUser.lat && mUser.lon) {
+    deliveryCoords = { lat: mUser.lat, lon: mUser.lon };
+  }
+
+  // Fallback to request info coordinates
+  if (!deliveryCoords && res.info.lat && res.info.lon) {
+    deliveryCoords = { lat: res.info.lat, lon: res.info.lon };
+  }
+
+  // Calculate distance if we have coordinates
+  if (deliveryCoords) {
+    const distRes = App.geo.lib.getDistance(deliveryCoords, mRestaurant, mDeliveryPriceSettings.unitType || 'miles');
+    if (distRes.success) {
+      mRestaurant.dataValues.distance = distRes.data.distance;
+      mRestaurant.dataValues.distanceType = distRes.data.units;
+    }
   }
 }
 
