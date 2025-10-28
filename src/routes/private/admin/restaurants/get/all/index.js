@@ -129,6 +129,28 @@ module.exports = function(App, RPath){
             //   }]
             // }]
           },
+          {
+            model: App.getModel('RestaurantOrderTypeSettings'),
+            required: false,
+            attributes: [
+              'id', 'orderType', 'isEnabled', 'pricingModel',
+              'basePrice', 'pricePerPerson', 'pricePerHour',
+              'minPeople', 'maxPeople', 'minHours', 'maxHours',
+              'serviceFeePercentage'
+            ],
+          },
+          {
+            model: App.getModel('RestaurantUnavailableDates'),
+            required: false,
+            attributes: ['id', 'unavailableDate', 'reason', 'isFullDayBlocked', 'blockedFromTime', 'blockedToTime'],
+          },
+          {
+            model: App.getModel('CuisineType'),
+            through: { attributes: [] }, // Exclude junction table fields
+            attributes: ['id', 'name', 'slug', 'description', 'image'],
+            where: { isActive: true },
+            required: false
+          },
         ],
         order: sortable[ sortBy ],
         offset: offset,

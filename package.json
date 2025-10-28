@@ -9,7 +9,9 @@
     "pm2:dev": "pm2 restart pm2.dev.ecosystem.config.js --env dev",
     "migrate:dev": "NODE_ENV=dev npx sequelize db:migrate --env dev",
     "seed:dev": "NODE_ENV=dev npx sequelize db:seed:all",
+    "seed:dev:one": "NODE_ENV=dev npx sequelize-cli db:seed --seed",
     "seed:undo:dev": "NODE_ENV=dev npx sequelize db:seed:undo:all",
+    "seed:undo:dev:one": "NODE_ENV=dev npx sequelize-cli db:seed:undo --seed",
     "db:reset:dev": "NODE_ENV=dev npx sequelize db:migrate:undo:all && NODE_ENV=dev npx sequelize db:migrate && NODE_ENV=dev npx sequelize db:seed:all",
     "start:rem": "NODE_ENV=rem nodemon index.js",
     "pm2:rem": "pm2 restart pm2.rem.ecosystem.config.js --env rem",
@@ -18,7 +20,10 @@
     "docker:restart": "./scripts/restart-dev.sh",
     "docker:logs": "./scripts/logs-dev.sh",
     "docker:exec": "./scripts/exec-dev.sh",
-    "docker:seed": "./scripts/exec-dev.sh npm run seed:dev"
+    "docker:seed": "./scripts/exec-dev.sh npm run seed:dev",
+    "docker:check-space": "./scripts/check-disk-space.sh",
+    "docker:analyze-images": "./scripts/analyze-images.sh",
+    "verify-restaurant": "node scripts/verify-restaurant-account.js"
   },
   "keywords": [],
   "author": "",

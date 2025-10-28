@@ -14,6 +14,10 @@ NODE_ENV=dev NODE_TYPE_T=api docker-compose \
 
 echo "✅ Container rebuilt and started successfully!"
 echo ""
+echo "🧹 Cleaning up old Docker images..."
+docker image prune -f
+echo "✅ Cleanup complete!"
+echo ""
 echo "📋 Useful commands:"
 echo "  docker logs -f 5be9107cad4b               # View logs"
 echo "  docker exec 5be9107cad4b npx pm2 list     # Check PM2 processes"
