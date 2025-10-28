@@ -18,7 +18,7 @@ async function verifyRestaurant() {
     const email = process.argv[2];
 
     if (!email) {
-      console.error('❌ Error: Email is required');
+      console.error('❌ Error: Email is required.');
       console.log('Usage: node scripts/verify-restaurant-account.js <email>');
       console.log('Example: node scripts/verify-restaurant-account.js test@restaurant.com');
       process.exit(1);
