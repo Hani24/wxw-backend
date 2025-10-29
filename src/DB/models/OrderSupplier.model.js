@@ -242,6 +242,31 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
 
   }
 
+  /**
+   * Model Associations
+   */
+  Model.associate = function(sequelize) {
+    const { Order, Restaurant, OrderSupplierItem } = sequelize.models;
+
+    // OrderSupplier belongs to Order
+    Model.belongsTo(Order, {
+      foreignKey: 'orderId',
+      as: 'Order'
+    });
+
+    // OrderSupplier belongs to Restaurant
+    Model.belongsTo(Restaurant, {
+      foreignKey: 'restaurantId',
+      as: 'Restaurant'
+    });
+
+    // OrderSupplier has many OrderSupplierItems
+    Model.hasMany(OrderSupplierItem, {
+      foreignKey: 'orderSupplierId',
+      as: 'OrderSupplierItems'
+    });
+  };
+
   return Model;
 
 }

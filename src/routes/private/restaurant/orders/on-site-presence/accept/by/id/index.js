@@ -23,18 +23,23 @@ module.exports = function(App, RPath){
         return App.json(res, 417, App.t(['Order ID is required'], req.lang));
 
       const statuses = App.getModel('Order').getStatuses();
+      const orderTypes = App.getModel('Order').getOrderTypes();
 
-      // Find the order (need to join through OrderSupplier to filter by restaurant)
+      // Find the order (support both on-site-presence and catering)
       const mOrder = await App.getModel('Order').findOne({
         where: {
           id: orderId,
-          orderType: 'on-site-presence',
+          orderType: [orderTypes['on-site-presence'], orderTypes['catering']],
           status: statuses['created'],
         },
         include: [
           {
             model: App.getModel('OrderOnSitePresenceDetails'),
-            required: true,
+            required: false,
+          },
+          {
+            model: App.getModel('OrderCateringDetails'),
+            required: false,
           },
           {
             model: App.getModel('OrderSupplier'),
@@ -49,7 +54,18 @@ module.exports = function(App, RPath){
       if(!App.isObject(mOrder) || !App.isPosNumber(mOrder.id))
         return App.json(res, 404, App.t(['Order not found'], req.lang));
 
-      const details = mOrder.OrderOnSitePresenceDetail;
+      // Get details based on order type
+      const isOnSitePresence = mOrder.orderType === orderTypes['on-site-presence'];
+      const isCatering = mOrder.orderType === orderTypes['catering'];
+
+      const details = isOnSitePresence
+        ? mOrder.OrderOnSitePresenceDetail
+        : isCatering
+          ? mOrder.OrderCateringDetail
+          : null;
+
+      if(!details)
+        return App.json(res, 404, App.t(['Order details not found'], req.lang));
 
       // Check if already accepted or rejected
       if(details.restaurantAcceptedAt)
@@ -104,6 +120,6 @@ module.exports = function(App, RPath){
 
   });
 
-  return { router, method: '', autoDoc:{} };
+  return { router, method: 'post', autoDoc:{} };
 
 };

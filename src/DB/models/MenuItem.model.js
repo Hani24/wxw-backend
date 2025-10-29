@@ -140,6 +140,25 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       : 0;
   }
 
+  /**
+   * Model Associations
+   */
+  Model.associate = function(sequelize) {
+    const { MenuCategory, CateringMenuItem } = sequelize.models;
+
+    // MenuItem belongs to MenuCategory
+    Model.belongsTo(MenuCategory, {
+      foreignKey: 'menuCategoryId',
+      as: 'MenuCategory'
+    });
+
+    // MenuItem has one CateringMenuItem
+    Model.hasOne(CateringMenuItem, {
+      foreignKey: 'menuItemId',
+      as: 'CateringMenuItem'
+    });
+  };
+
   return Model;
 
 }

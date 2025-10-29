@@ -161,6 +161,6 @@ module.exports = function(App, RPath){
 
   });
 
-  return { router, method: '', autoDoc:{} };
+  return { router, method: 'post', autoDoc:{} };
 
 };

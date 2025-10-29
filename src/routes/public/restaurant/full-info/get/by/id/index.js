@@ -201,7 +201,15 @@ module.exports = function (App, RPath) {
         }
       }
 
-     // Get menu categories with items
+     // Add CateringMenuItem to includes
+      includeMenuItem.push({
+        model: App.getModel('CateringMenuItem'),
+        as: 'CateringMenuItem',
+        attributes: ['id', 'feedsPeople', 'minimumQuantity', 'leadTimeDays', 'isAvailableForCatering', 'cateringPrice'],
+        required: false,
+      });
+
+      // Get menu categories with items
       const mMenuCategories = await App.getModel('MenuCategory').findAll({
         where: {
           restaurantId: mRestaurant.id,
@@ -243,9 +251,29 @@ module.exports = function (App, RPath) {
                 mMenuItem.dataValues.amountInCart = mMenuItem.CartItems[0].amount;
               }
 
+              // Add catering availability information
+              if (App.isObject(mMenuItem.CateringMenuItem)) {
+                mMenuItem.dataValues.catering = {
+                  isAvailableForCatering: mMenuItem.CateringMenuItem.isAvailableForCatering,
+                  feedsPeople: mMenuItem.CateringMenuItem.feedsPeople,
+                  minimumQuantity: mMenuItem.CateringMenuItem.minimumQuantity,
+                  leadTimeDays: mMenuItem.CateringMenuItem.leadTimeDays,
+                  cateringPrice: mMenuItem.CateringMenuItem.cateringPrice ? parseFloat(mMenuItem.CateringMenuItem.cateringPrice) : null,
+                };
+              } else {
+                mMenuItem.dataValues.catering = {
+                  isAvailableForCatering: false,
+                  feedsPeople: null,
+                  minimumQuantity: null,
+                  leadTimeDays: null,
+                  cateringPrice: null,
+                };
+              }
+
               // Clean up internal fields
               delete mMenuItem.dataValues.CartItems;
               delete mMenuItem.dataValues.FavoriteMenuItem;
+              delete mMenuItem.dataValues.CateringMenuItem;
             }
           }
           return MenuCategory;
