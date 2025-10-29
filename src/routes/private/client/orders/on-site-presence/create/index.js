@@ -263,13 +263,18 @@ module.exports = function(App, RPath){
 
         await tx.commit();
 
-        // Return response with order details (payment intent will be created in order/confirm)
-        await App.json(res, true, App.t(['On-site presence order created successfully'], req.lang), {
-          id: mOrder.id,
-          status: mOrder.status,
-          orderType: 'on-site-presence',
-          order: mOrder,
+        // Fetch the order with on-site presence details included
+        mOrder = await App.getModel('Order').findByPk(mOrder.id, {
+          include: [
+            {
+              model: App.getModel('OrderOnSitePresenceDetails'),
+              required: false,
+            }
+          ]
         });
+
+        // Return order directly (consistent with /orders/create endpoint)
+        await App.json(res, true, App.t(['On-site presence order created successfully'], req.lang), mOrder);
 
         // Update client statistics
         await mClient.update({
