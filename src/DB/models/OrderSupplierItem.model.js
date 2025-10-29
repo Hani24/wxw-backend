@@ -59,6 +59,25 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     },
   });
 
+  /**
+   * Model Associations
+   */
+  Model.associate = function(sequelize) {
+    const { OrderSupplier, MenuItem } = sequelize.models;
+
+    // OrderSupplierItem belongs to OrderSupplier
+    Model.belongsTo(OrderSupplier, {
+      foreignKey: 'orderSupplierId',
+      as: 'OrderSupplier'
+    });
+
+    // OrderSupplierItem belongs to MenuItem
+    Model.belongsTo(MenuItem, {
+      foreignKey: 'menuItemId',
+      as: 'MenuItem'
+    });
+  };
+
   return Model;
 
 }
