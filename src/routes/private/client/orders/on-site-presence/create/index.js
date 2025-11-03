@@ -167,6 +167,10 @@ module.exports = function(App, RPath){
         // Calculate acceptance deadline (24 hours from now)
         const acceptanceDeadline = App.getModel('OrderOnSitePresenceDetails').calculate24HourDeadline();
 
+        // Calculate payment schedule
+        const OrderOnSitePresenceDetails = App.getModel('OrderOnSitePresenceDetails');
+        const paymentSchedule = OrderOnSitePresenceDetails.calculatePaymentSchedule(eventDate, estimatedTotalPrice);
+
         // Create on-site presence details
         const mOnSiteDetails = await App.getModel('OrderOnSitePresenceDetails').create({
           orderId: mOrder.id,
@@ -179,6 +183,10 @@ module.exports = function(App, RPath){
           estimatedBasePrice,
           estimatedServiceFee,
           estimatedTotalPrice,
+          firstPaymentAmount: paymentSchedule.firstPaymentAmount,
+          firstPaymentDueDate: paymentSchedule.firstPaymentDueDate,
+          secondPaymentAmount: paymentSchedule.secondPaymentAmount,
+          secondPaymentDueDate: paymentSchedule.secondPaymentDueDate,
           acceptanceDeadline,
         }, { transaction: tx });
 

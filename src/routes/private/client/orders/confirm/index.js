@@ -32,10 +32,11 @@ module.exports = function(App, RPath){
       mOrder = await App.getModel('Order').findOne({
         where: {
           id,
-          clientId: mClient.id,          
+          clientId: mClient.id,
         },
         include: [{
           model: App.getModel('OrderSupplier'),
+          as: 'OrderSuppliers',
           attributes: [
             'id','restaurantId',
             'isValidChecksum','checksum',
@@ -43,11 +44,13 @@ module.exports = function(App, RPath){
           ],
           include: [{
             model: App.getModel('OrderSupplierItem'),
+            as: 'OrderSupplierItems',
             attributes: [
               'id','price','amount',
             ],
             include: [{
               model: App.getModel('MenuItem'),
+              as: 'MenuItem',
               attributes: ['id','name'],
             }]
           }]
@@ -118,11 +121,12 @@ module.exports = function(App, RPath){
 
       } // set from defaults
 
-      // Check if this is an on-site-presence order
+      // Check if this is an on-site-presence or catering order
       const isOnSitePresence = mOrder.orderType === orderTypes['on-site-presence'];
+      const isCatering = mOrder.orderType === orderTypes['catering'];
 
-      // For regular orders (not on-site-presence), handle delivery address
-      if(!isOnSitePresence) {
+      // For regular orders (not on-site-presence or catering), handle delivery address
+      if(!isOnSitePresence && !isCatering) {
         let mDeliveryAddress = await App.getModel('OrderDeliveryAddress').getByFields({ orderId: mOrder.id });
 
         // Try: Get && Add default Delivery-Address if: Client have not sent any Delivery-Address
@@ -151,8 +155,8 @@ module.exports = function(App, RPath){
       }
 
       // verify that user has set all required data for delivery and payment
-      // For on-site-presence orders, skip delivery-related validations
-      const orderModels = isOnSitePresence
+      // For on-site-presence and catering orders, skip delivery-related validations
+      const orderModels = (isOnSitePresence || isCatering)
         ? [
             { model: 'OrderPaymentType', message: ['Please','select','payment','type'/*,'is-required'*/] },
           ]
@@ -177,21 +181,42 @@ module.exports = function(App, RPath){
         return await App.json( res, 404, App.t(['Order payment type not found'], req.lang) );
 
       // payment_method_types
-      //   card, acss_debit, affirm, afterpay_clearpay, alipay, au_becs_debit, bacs_debit, bancontact, boleto, 
-      //   card_present, customer_balance, eps, fpx, giropay, grabpay, ideal, interac_present, klarna, 
+      //   card, acss_debit, affirm, afterpay_clearpay, alipay, au_becs_debit, bacs_debit, bancontact, boleto,
+      //   card_present, customer_balance, eps, fpx, giropay, grabpay, ideal, interac_present, klarna,
       //   konbini, link, oxxo, p24, paynow, sepa_debit, sofort, us_bank_account, and wechat_pay.
+
+      // For catering and on-site-presence orders, charge only the first payment (50%)
+      let paymentAmount = Math.floor( mOrder.finalPrice * 100 );
+      let paymentDescription = `Order: #${mOrder.id}`;
+
+      if(isCatering) {
+        const cateringDetails = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
+        if(cateringDetails && cateringDetails.firstPaymentAmount) {
+          paymentAmount = Math.floor( cateringDetails.firstPaymentAmount * 100 );
+          paymentDescription = `Catering Order: #${mOrder.id} - First Payment (50%)`;
+        }
+      }
+
+      if(isOnSitePresence) {
+        const onSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
+        if(onSiteDetails && onSiteDetails.firstPaymentAmount) {
+          paymentAmount = Math.floor( onSiteDetails.firstPaymentAmount * 100 );
+          paymentDescription = `On-Site Presence Order: #${mOrder.id} - First Payment (50%)`;
+        }
+      }
 
       const paymentIntentConfig = {
         // confirm: true, // default: false,
         receipt_email: mUser.email,
         // payment_method_types: ['card'],
-        amount: Math.floor( mOrder.finalPrice * 100 ),
+        amount: paymentAmount,
         // currency: 'eur',
         customer: mClient.customerId,
         // payment_method: mPaymentCard.paymentMethodId,
-        description: `Order: #${mOrder.id}`,
+        description: paymentDescription,
         metadata: {
           orderId: mOrder.id,
+          orderType: mOrder.orderType,
           userId: mUser.id,
           clientId: mClient.id,
           totalItems: mOrder.totalItems,
@@ -204,6 +229,8 @@ module.exports = function(App, RPath){
           _discountType: mOrder.discountType,
           _discountCode: mOrder.discountCode,
           _discountAmount: mOrder.discountAmount,
+          // For catering and on-site-presence: indicate this is first payment
+          ...(isCatering || isOnSitePresence ? { paymentType: 'first_payment' } : {}),
           // nested objects are not allowed by stripe
           // discount: {
           //   type: mOrder.discountType || 'n/a',
@@ -281,32 +308,29 @@ module.exports = function(App, RPath){
       if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
         return await App.json( res, false, App.t(['Failed to update payment details'], req.lang) );
 
-      // Build order details response based on order type
+      // Build order details response - flattened structure
       const orderDetails = {
         clientSecret,
         paymentIntentId,
         id: mOrder.id,
         status: mOrder.status,
-        order: {
-          id: mOrder.id,
-          isFreeDelivery: mOrder.isFreeDelivery,
-          totalItems: mOrder.totalItems,
-          totalPrice: mOrder.totalPrice,
-          totalPriceFee: mOrder.totalPriceFee,
-          deliveryPrice: mOrder.deliveryPrice,
-          deliveryPriceFee: mOrder.deliveryPriceFee,
-          finalPrice: mOrder.finalPrice,
-          deliveryDistanceValue: mOrder.deliveryDistanceValue,
-          deliveryDistanceType: mOrder.deliveryDistanceType,
-          items: [],
-        }
+        isFreeDelivery: mOrder.isFreeDelivery,
+        totalItems: mOrder.totalItems,
+        totalPrice: mOrder.totalPrice,
+        totalPriceFee: mOrder.totalPriceFee,
+        deliveryPrice: mOrder.deliveryPrice,
+        deliveryPriceFee: mOrder.deliveryPriceFee,
+        finalPrice: mOrder.finalPrice,
+        deliveryDistanceValue: mOrder.deliveryDistanceValue,
+        deliveryDistanceType: mOrder.deliveryDistanceType,
+        items: [],
       };
 
       // For on-site-presence orders, fetch and include event details
       if(isOnSitePresence) {
         const mOnSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
         if(App.isObject(mOnSiteDetails) && App.isPosNumber(mOnSiteDetails.id)) {
-          orderDetails.order.onSitePresenceDetails = {
+          orderDetails.onSitePresenceDetails = {
             eventDate: mOnSiteDetails.eventDate,
             eventStartTime: mOnSiteDetails.eventStartTime,
             eventEndTime: mOnSiteDetails.eventEndTime,
@@ -316,10 +340,61 @@ module.exports = function(App, RPath){
             estimatedBasePrice: mOnSiteDetails.estimatedBasePrice,
             estimatedServiceFee: mOnSiteDetails.estimatedServiceFee,
             estimatedTotalPrice: mOnSiteDetails.estimatedTotalPrice,
+            paymentSchedule: {
+              firstPayment: {
+                amount: mOnSiteDetails.firstPaymentAmount,
+                dueDate: mOnSiteDetails.firstPaymentDueDate,
+                paidAt: mOnSiteDetails.firstPaymentPaidAt,
+                description: '50% - 10 days before event (Non-refundable)'
+              },
+              secondPayment: {
+                amount: mOnSiteDetails.secondPaymentAmount,
+                dueDate: mOnSiteDetails.secondPaymentDueDate,
+                paidAt: mOnSiteDetails.secondPaymentPaidAt,
+                description: '50% - 3 days before event (Non-refundable)'
+              }
+            },
             acceptanceDeadline: mOnSiteDetails.acceptanceDeadline,
             restaurantAcceptedAt: mOnSiteDetails.restaurantAcceptedAt,
             restaurantRejectedAt: mOnSiteDetails.restaurantRejectedAt,
             rejectionReason: mOnSiteDetails.rejectionReason,
+          };
+        }
+      }
+
+      // For catering orders, fetch and include catering details
+      if(isCatering) {
+        const mCateringDetails = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
+        if(App.isObject(mCateringDetails) && App.isPosNumber(mCateringDetails.id)) {
+          orderDetails.cateringDetails = {
+            eventDate: mCateringDetails.eventDate,
+            eventStartTime: mCateringDetails.eventStartTime,
+            eventEndTime: mCateringDetails.eventEndTime,
+            deliveryMethod: mCateringDetails.deliveryMethod,
+            deliveryAddress: mCateringDetails.deliveryAddress,
+            estimatedTotalPeople: mCateringDetails.estimatedTotalPeople,
+            specialRequests: mCateringDetails.specialRequests,
+            estimatedBasePrice: mCateringDetails.estimatedBasePrice,
+            estimatedServiceFee: mCateringDetails.estimatedServiceFee,
+            estimatedTotalPrice: mCateringDetails.estimatedTotalPrice,
+            paymentSchedule: {
+              firstPayment: {
+                amount: mCateringDetails.firstPaymentAmount,
+                dueDate: mCateringDetails.firstPaymentDueDate,
+                paidAt: mCateringDetails.firstPaymentPaidAt,
+                description: '50% - 10 days before event (Non-refundable)'
+              },
+              secondPayment: {
+                amount: mCateringDetails.secondPaymentAmount,
+                dueDate: mCateringDetails.secondPaymentDueDate,
+                paidAt: mCateringDetails.secondPaymentPaidAt,
+                description: '50% - 3 days before event (Non-refundable)'
+              }
+            },
+            acceptanceDeadline: mCateringDetails.acceptanceDeadline,
+            restaurantAcceptedAt: mCateringDetails.restaurantAcceptedAt,
+            restaurantRejectedAt: mCateringDetails.restaurantRejectedAt,
+            rejectionReason: mCateringDetails.rejectionReason,
           };
         }
       }
@@ -382,6 +457,28 @@ module.exports = function(App, RPath){
           if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
             throw Error('Failed update mOrder record');
 
+          // For catering orders, update first payment details
+          if(isCatering) {
+            const mCateringDetails = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
+            if(mCateringDetails) {
+              await mCateringDetails.update({
+                firstPaymentIntentId: paymentIntentId,
+                firstPaymentPaidAt: App.getISODate()
+              }, {transaction: tx});
+            }
+          }
+
+          // For on-site-presence orders, update first payment details
+          if(isOnSitePresence) {
+            const mOnSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
+            if(mOnSiteDetails) {
+              await mOnSiteDetails.update({
+                firstPaymentIntentId: paymentIntentId,
+                firstPaymentPaidAt: App.getISODate()
+              }, {transaction: tx});
+            }
+          }
+
           await tx.commit();
 
         }catch(e){
@@ -420,7 +517,7 @@ module.exports = function(App, RPath){
         // only required in (ApplePay)
         mOrder.OrderSuppliers.map((mOS)=>{
           mOS.OrderSupplierItems.map((mOSI)=>{
-            orderDetails.order.items.push({
+            orderDetails.items.push({
               id: mOSI.id,
               amount: mOSI.amount,
               price: mOSI.price,
@@ -463,7 +560,7 @@ module.exports = function(App, RPath){
 
   });
 
-  return { router, method: '', autoDoc:{} };
+  return { router, method: 'post', autoDoc:{} };
 
 };
 

@@ -500,6 +500,31 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     }
   }
 
+  /**
+   * Model Associations
+   */
+  Model.associate = function(sequelize) {
+    const { OrderSupplier, OrderCateringDetails, OrderOnSitePresenceDetails } = sequelize.models;
+
+    // Order has many OrderSuppliers (one per restaurant in the order)
+    Model.hasMany(OrderSupplier, {
+      foreignKey: 'orderId',
+      as: 'OrderSuppliers'
+    });
+
+    // Order has one OrderCateringDetails (for catering orders)
+    Model.hasOne(OrderCateringDetails, {
+      foreignKey: 'orderId',
+      as: 'OrderCateringDetails'
+    });
+
+    // Order has one OrderOnSitePresenceDetails (for on-site presence orders)
+    Model.hasOne(OrderOnSitePresenceDetails, {
+      foreignKey: 'orderId',
+      as: 'OrderOnSitePresenceDetails'
+    });
+  };
+
   return Model;
 
 }
