@@ -6,6 +6,7 @@ Create a catering order
 {
   "restaurantId": "required: <number>",
   "eventDate": "required: <string> YYYY-MM-DD",
+  "numberOfPeople": "required: <number> Total number of people to feed",
   "eventStartTime": "optional: <string> HH:MM",
   "eventEndTime": "optional: <string> HH:MM",
   "deliveryMethod": "required: <string> pickup | drop-off",
@@ -13,7 +14,7 @@ Create a catering order
   "deliveryLatitude": "optional: <number> Required if drop-off",
   "deliveryLongitude": "optional: <number> Required if drop-off",
   "specialRequests": "optional: <string>",
-  "items": "required: <array> [{menuItemId, quantity}]"
+  "items": "required: <array> [{menuItemId}] - Quantities will be auto-calculated based on numberOfPeople"
 }
 */
 
@@ -33,6 +34,12 @@ module.exports = function(App, RPath){
       const restaurantId = req.getCommonDataInt('restaurantId', null);
       if(!App.isPosNumber(restaurantId)){
         return App.json(res, 417, App.t(['Restaurant ID is required'], req.lang));
+      }
+
+      // Validate numberOfPeople
+      const numberOfPeople = req.getCommonDataInt('numberOfPeople', null);
+      if(!App.isPosNumber(numberOfPeople) || numberOfPeople < 1){
+        return App.json(res, 417, App.t(['Number of people is required and must be at least 1'], req.lang));
       }
 
       // Validate event date
@@ -120,42 +127,9 @@ module.exports = function(App, RPath){
       // If event is less than 10 days away, first payment is due immediately
       // If event is less than 3 days away, both payments are due immediately
 
-      // Check for existing unaccepted catering orders for the same restaurant
+      // Get statuses and order types for later use
       const statuses = App.getModel('Order').getStatuses();
       const orderTypes = App.getModel('Order').getOrderTypes();
-
-      const existingUnacceptedOrder = await App.getModel('Order').findOne({
-        where: {
-          clientId: mClient.id,
-          orderType: orderTypes['catering'],
-          status: {
-            [App.DB.Op.or]: [statuses['created'], statuses['processing']]
-          }
-        },
-        include: [{
-          model: App.getModel('OrderSupplier'),
-          as: 'OrderSuppliers',
-          where: {
-            restaurantId,
-            isAcceptedByRestaurant: false
-          },
-          attributes: ['restaurantId', 'isAcceptedByRestaurant']
-        }, {
-          model: App.getModel('OrderCateringDetails'),
-          as: 'OrderCateringDetails',
-          where: {
-            restaurantAcceptedAt: null
-          },
-          attributes: ['id', 'restaurantAcceptedAt'],
-          required: false
-        }]
-      });
-
-      if(existingUnacceptedOrder){
-        return App.json(res, 417, App.t([
-          'You already have a pending catering order for this restaurant. Please wait for the restaurant to respond.'
-        ], req.lang));
-      }
 
       // Validate and calculate pricing for all items
       const CateringMenuItem = App.getModel('CateringMenuItem');
@@ -168,10 +142,9 @@ module.exports = function(App, RPath){
 
       for(const orderItem of data.items){
         const menuItemId = parseInt(orderItem.menuItemId);
-        const quantity = parseInt(orderItem.quantity);
 
-        if(!App.isPosNumber(menuItemId) || !App.isPosNumber(quantity)){
-          return App.json(res, 417, App.t(['Invalid item data'], req.lang));
+        if(!App.isPosNumber(menuItemId)){
+          return App.json(res, 417, App.t(['Invalid menu item ID'], req.lang));
         }
 
         // Get catering menu item
@@ -204,23 +177,33 @@ module.exports = function(App, RPath){
           ], req.lang));
         }
 
-        // Check minimum quantity
-        const qtyValidation = CateringMenuItem.validateMinimumQuantity(cateringMenuItem, quantity);
-        if(!qtyValidation.success){
-          return App.json(res, 417, App.t([qtyValidation.message], req.lang));
+        // Calculate quantity needed to serve numberOfPeople
+        // If item feeds 5 people and we need 12 people: quantity = Math.ceil(12/5) = 3
+        const feedsPeople = cateringMenuItem.feedsPeople || 1;
+        let calculatedQuantity = Math.ceil(numberOfPeople / feedsPeople);
+
+        // Ensure we meet minimum quantity requirement
+        const minimumQuantity = cateringMenuItem.minimumQuantity || 1;
+        if(calculatedQuantity < minimumQuantity){
+          calculatedQuantity = minimumQuantity;
         }
 
+        // Calculate actual people served (may be more than requested due to minimums)
+        const actualPeopleServed = calculatedQuantity * feedsPeople;
+
         const effectivePrice = cateringMenuItem.cateringPrice || cateringMenuItem.MenuItem.price;
-        const subtotal = effectivePrice * quantity;
-        const peopleServed = cateringMenuItem.feedsPeople * quantity;
+        const subtotal = effectivePrice * calculatedQuantity;
 
         totalBasePrice += subtotal;
-        totalPeopleServed += peopleServed;
+        totalPeopleServed += actualPeopleServed;
 
         validatedItems.push({
           cateringMenuItem,
           menuItem: cateringMenuItem.MenuItem,
-          quantity,
+          quantity: calculatedQuantity,
+          requestedPeople: numberOfPeople,
+          actualPeopleServed: actualPeopleServed,
+          feedsPeople: feedsPeople,
           effectivePrice,
           subtotal
         });
@@ -266,6 +249,8 @@ module.exports = function(App, RPath){
         const acceptanceDeadline = OrderCateringDetails.calculate24HourDeadline();
 
         // Create catering details
+        // Note: estimatedTotalPeople stores actual people served (may be higher due to minimum quantities)
+        // The requested numberOfPeople is used for calculation but not stored separately
         const mCateringDetails = await App.getModel('OrderCateringDetails').create({
           orderId: mOrder.id,
           eventDate,

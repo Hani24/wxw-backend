@@ -6,8 +6,9 @@ Estimate catering order price
 {
   "restaurantId": "required: <number>",
   "eventDate": "required: <string> YYYY-MM-DD",
+  "numberOfPeople": "required: <number> Total number of people to feed",
   "deliveryMethod": "required: <string> pickup | drop-off",
-  "items": "required: <array> [{menuItemId, quantity}]"
+  "items": "required: <array> [{menuItemId}] - Quantities will be auto-calculated based on numberOfPeople"
 }
 */
 
@@ -27,6 +28,12 @@ module.exports = function(App, RPath){
       const restaurantId = req.getCommonDataInt('restaurantId', null);
       if(!App.isPosNumber(restaurantId)){
         return App.json(res, 417, App.t(['field','[restaurantId]','is-required'], req.lang));
+      }
+
+      // Validate numberOfPeople
+      const numberOfPeople = req.getCommonDataInt('numberOfPeople', null);
+      if(!App.isPosNumber(numberOfPeople) || numberOfPeople < 1){
+        return App.json(res, 417, App.t(['Number of people is required and must be at least 1'], req.lang));
       }
 
       // Validate event date
@@ -111,15 +118,9 @@ module.exports = function(App, RPath){
 
       for(const orderItem of data.items){
         const menuItemId = parseInt(orderItem.menuItemId);
-        const quantity = parseInt(orderItem.quantity);
 
         if(!App.isPosNumber(menuItemId)){
           errors.push(`Invalid menuItemId: ${orderItem.menuItemId}`);
-          continue;
-        }
-
-        if(!App.isPosNumber(quantity) || quantity < 1){
-          errors.push(`Invalid quantity for menuItemId ${menuItemId}`);
           continue;
         }
 
@@ -153,20 +154,26 @@ module.exports = function(App, RPath){
           continue;
         }
 
-        // Check minimum quantity
-        const qtyValidation = CateringMenuItem.validateMinimumQuantity(cateringMenuItem, quantity);
-        if(!qtyValidation.success){
-          errors.push(`${cateringMenuItem.MenuItem.name}: ${qtyValidation.message}`);
-          continue;
+        // Calculate quantity needed to serve numberOfPeople
+        // If item feeds 5 people and we need 12 people: quantity = Math.ceil(12/5) = 3
+        const feedsPeople = cateringMenuItem.feedsPeople || 1;
+        let calculatedQuantity = Math.ceil(numberOfPeople / feedsPeople);
+
+        // Ensure we meet minimum quantity requirement
+        const minimumQuantity = cateringMenuItem.minimumQuantity || 1;
+        if(calculatedQuantity < minimumQuantity){
+          calculatedQuantity = minimumQuantity;
         }
+
+        // Calculate actual people served (may be more than requested due to minimums)
+        const actualPeopleServed = calculatedQuantity * feedsPeople;
 
         // Calculate prices
         const effectivePrice = cateringMenuItem.cateringPrice || cateringMenuItem.MenuItem.price;
-        const subtotal = effectivePrice * quantity;
-        const peopleServed = cateringMenuItem.feedsPeople * quantity;
+        const subtotal = effectivePrice * calculatedQuantity;
 
         totalBasePrice += subtotal;
-        totalPeopleServed += peopleServed;
+        totalPeopleServed += actualPeopleServed;
 
         itemsData.push({
           menuItemId,
@@ -174,11 +181,12 @@ module.exports = function(App, RPath){
           name: cateringMenuItem.MenuItem.name,
           description: cateringMenuItem.MenuItem.description,
           image: cateringMenuItem.MenuItem.image,
-          quantity,
+          quantity: calculatedQuantity,
+          requestedPeople: numberOfPeople,
+          actualPeopleServed: actualPeopleServed,
           pricePerItem: effectivePrice,
           subtotal: parseFloat(subtotal.toFixed(2)),
           feedsPeople: cateringMenuItem.feedsPeople,
-          totalPeopleServed: peopleServed,
           minimumQuantity: cateringMenuItem.minimumQuantity,
           leadTimeDays: cateringMenuItem.leadTimeDays
         });
@@ -206,6 +214,7 @@ module.exports = function(App, RPath){
         restaurantName: restaurant.name,
         eventDate,
         deliveryMethod,
+        requestedNumberOfPeople: numberOfPeople,
         estimatedTotalPeople: totalPeopleServed,
         items: itemsData,
         pricing: {

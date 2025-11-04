@@ -80,47 +80,9 @@ module.exports = function(App, RPath){
       if(!isDateAvailable)
         return App.json(res, 417, App.t(['Selected date is not available for this restaurant'], req.lang));
 
-      // Check for existing unaccepted on-site presence orders for the same restaurant
+      // Get statuses and order types for later use
       const statuses = App.getModel('Order').getStatuses();
       const orderTypes = App.getModel('Order').getOrderTypes();
-
-      // Find existing on-site presence orders that are not yet accepted
-      const existingUnacceptedOrder = await App.getModel('Order').findOne({
-        where: {
-          clientId: mClient.id,
-          orderType: orderTypes['on-site-presence'],
-          status: {
-            [App.DB.Op.or]: [
-              statuses['created'],
-              statuses['processing'],
-            ]
-          },
-        },
-        include: [
-          {
-            model: App.getModel('OrderSupplier'),
-            where: {
-              restaurantId: restaurantId,
-              isAcceptedByRestaurant: false,  // Not yet accepted
-            },
-            attributes: ['restaurantId', 'isAcceptedByRestaurant'],
-          },
-          {
-            model: App.getModel('OrderOnSitePresenceDetails'),
-            where: {
-              restaurantAcceptedAt: null,  // Restaurant hasn't accepted yet
-            },
-            attributes: ['id', 'restaurantAcceptedAt'],
-            required: false,
-          }
-        ]
-      });
-
-      if(existingUnacceptedOrder) {
-        return App.json(res, 417, App.t([
-          'You already have a pending on-site presence order for this restaurant that has not been accepted yet. Please wait for the restaurant to respond before placing a new order.'
-        ], req.lang));
-      }
 
       // Calculate price estimate
       const priceResult = await App.getModel('RestaurantOrderTypeSettings').calculateOnSitePresencePrice(

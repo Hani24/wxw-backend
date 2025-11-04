@@ -109,6 +109,20 @@ module.exports = function(App, RPath) {
               'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
               'acceptanceDeadline',
             ],
+          },
+          {
+            required: false, // Optional - only for catering orders
+            model: App.getModel('OrderCateringDetails'),
+            attributes: [
+              'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+              'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
+              'estimatedTotalPeople', 'specialRequests',
+              'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+              'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+              'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
+              'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+              'acceptanceDeadline',
+            ],
           }
         ],
         order: [[orderBy, order]],
@@ -201,12 +215,42 @@ module.exports = function(App, RPath) {
           };
         }
 
+        // Add catering details if this is a catering order
+        if (mOrder.orderType === orderTypes['catering'] && mOrder.OrderCateringDetail) {
+          const details = mOrder.OrderCateringDetail;
+          mOrder.dataValues.cateringDetails = {
+            eventDate: details.eventDate,
+            eventStartTime: details.eventStartTime || null,
+            eventEndTime: details.eventEndTime || null,
+            deliveryMethod: details.deliveryMethod || null,
+            deliveryAddress: details.deliveryAddress || null,
+            deliveryLatitude: details.deliveryLatitude ? parseFloat(details.deliveryLatitude) : null,
+            deliveryLongitude: details.deliveryLongitude ? parseFloat(details.deliveryLongitude) : null,
+            estimatedTotalPeople: details.estimatedTotalPeople || 0,
+            specialRequests: details.specialRequests || null,
+            estimatedBasePrice: details.estimatedBasePrice ? parseFloat(details.estimatedBasePrice) : null,
+            estimatedServiceFee: details.estimatedServiceFee ? parseFloat(details.estimatedServiceFee) : null,
+            estimatedTotalPrice: details.estimatedTotalPrice ? parseFloat(details.estimatedTotalPrice) : null,
+            firstPaymentAmount: details.firstPaymentAmount ? parseFloat(details.firstPaymentAmount) : null,
+            firstPaymentDueDate: details.firstPaymentDueDate || null,
+            firstPaymentPaidAt: details.firstPaymentPaidAt || null,
+            secondPaymentAmount: details.secondPaymentAmount ? parseFloat(details.secondPaymentAmount) : null,
+            secondPaymentDueDate: details.secondPaymentDueDate || null,
+            secondPaymentPaidAt: details.secondPaymentPaidAt || null,
+            restaurantAcceptedAt: details.restaurantAcceptedAt || null,
+            restaurantRejectedAt: details.restaurantRejectedAt || null,
+            rejectionReason: details.rejectionReason || null,
+            acceptanceDeadline: details.acceptanceDeadline || null,
+          };
+        }
+
         // Remove unnecessary properties
         delete mOrder.dataValues.OrderPaymentType;
         delete mOrder.dataValues.OrderDeliveryTime;
         delete mOrder.dataValues.OrderDeliveryAddress;
         delete mOrder.dataValues.OrderSuppliers;
         delete mOrder.dataValues.OrderOnSitePresenceDetail;
+        delete mOrder.dataValues.OrderCateringDetail;
       }
 
       App.json(res, true, App.t('success', res.lang), mOrders);
