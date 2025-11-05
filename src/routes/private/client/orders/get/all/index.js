@@ -113,6 +113,7 @@ module.exports = function(App, RPath) {
           {
             required: false, // Optional - only for catering orders
             model: App.getModel('OrderCateringDetails'),
+            as: 'OrderCateringDetails',
             attributes: [
               'id', 'eventDate', 'eventStartTime', 'eventEndTime',
               'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
@@ -216,8 +217,8 @@ module.exports = function(App, RPath) {
         }
 
         // Add catering details if this is a catering order
-        if (mOrder.orderType === orderTypes['catering'] && mOrder.OrderCateringDetail) {
-          const details = mOrder.OrderCateringDetail;
+        if (mOrder.orderType === orderTypes['catering'] && mOrder.OrderCateringDetails) {
+          const details = mOrder.OrderCateringDetails;
           mOrder.dataValues.cateringDetails = {
             eventDate: details.eventDate,
             eventStartTime: details.eventStartTime || null,
@@ -250,7 +251,7 @@ module.exports = function(App, RPath) {
         delete mOrder.dataValues.OrderDeliveryAddress;
         delete mOrder.dataValues.OrderSuppliers;
         delete mOrder.dataValues.OrderOnSitePresenceDetail;
-        delete mOrder.dataValues.OrderCateringDetail;
+        delete mOrder.dataValues.OrderCateringDetails;
       }
 
       App.json(res, true, App.t('success', res.lang), mOrders);
