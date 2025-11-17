@@ -10,7 +10,7 @@ module.exports = function(App, RPath) {
       const mUser = await req.user;
       const mRestaurant = await req.restaurant;
 
-      const { offset, limit, order, by } = req.getPagination({ order: 'asc' });
+      const { offset, limit, order, by } = req.getPagination({ order: 'desc' });
       const orderBy = App.getModel('Order').getOrderBy(by);
       const statuses = App.getModel('Order').getStatuses();
 

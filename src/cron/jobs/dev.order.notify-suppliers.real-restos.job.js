@@ -69,7 +69,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
         include: [
           {
             model: App.getModel('OrderDeliveryTime'),
-            required: true,
+            required: false,
             attributes: ['id'],
             where: {
               deliveryDay: deliveryDays.today,

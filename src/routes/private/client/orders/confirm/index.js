@@ -125,8 +125,11 @@ module.exports = function(App, RPath){
       const isOnSitePresence = mOrder.orderType === orderTypes['on-site-presence'];
       const isCatering = mOrder.orderType === orderTypes['catering'];
 
-      // For regular orders (not on-site-presence or catering), handle delivery address
-      if(!isOnSitePresence && !isCatering) {
+      // Check if this is a pickup order (free delivery with no delivery price)
+      const isPickup = mOrder.isFreeDelivery && mOrder.deliveryPrice === 0;
+
+      // For regular orders (not on-site-presence, catering, or pickup), handle delivery address
+      if(!isOnSitePresence && !isCatering && !isPickup) {
         let mDeliveryAddress = await App.getModel('OrderDeliveryAddress').getByFields({ orderId: mOrder.id });
 
         // Try: Get && Add default Delivery-Address if: Client have not sent any Delivery-Address
@@ -155,8 +158,8 @@ module.exports = function(App, RPath){
       }
 
       // verify that user has set all required data for delivery and payment
-      // For on-site-presence and catering orders, skip delivery-related validations
-      const orderModels = (isOnSitePresence || isCatering)
+      // For on-site-presence, catering, and pickup orders, skip delivery-related validations
+      const orderModels = (isOnSitePresence || isCatering || isPickup)
         ? [
             { model: 'OrderPaymentType', message: ['Please','select','payment','type'/*,'is-required'*/] },
           ]
