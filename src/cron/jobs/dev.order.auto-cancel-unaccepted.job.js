@@ -8,7 +8,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
     runAtStart: false,
     debug: config.debug,
     runAt: [
-      { each: 30, type: 'seconds' }, // Run every 30 seconds to check for expired orders
+      { each: 15, type: 'minutes' }, // Run every 15 minutes to check for expired orders
     ],
   });
 
@@ -20,7 +20,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
     try{
 
       const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - (10 * 60 * 1000)); // 10 minutes ago
+      const fiveMinutesAgo = new Date(now.getTime() - (15 * 60 * 1000)); // 10 minutes ago
 
       if(job.isDebugOn()){
         job.debug(`start on: [${App.getNodeUID()}] at: ${App.getISODate()}`);
