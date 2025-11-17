@@ -24,4 +24,10 @@ module.exports = [
   'orderCanceled', // by: [server]
   'orderDiscarded', // by: [server]
 
+  // News Feed
+  'postLiked',
+  'postCommented',
+  'newFollower',
+  'eventRSVP',
+
 ];

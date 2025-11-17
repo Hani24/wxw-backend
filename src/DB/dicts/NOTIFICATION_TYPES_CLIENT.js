@@ -28,4 +28,8 @@ module.exports = [
   'orderRefunded',
   'orderDiscarded',
 
+  // News Feed
+  'newPost',
+  'newEvent',
+
 ];

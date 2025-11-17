@@ -27,4 +27,10 @@ module.exports = [
 
   'adminP2pMessage',
   'adminBroadcastMessage',
+
+  // News Feed events
+  'newFollower',
+  'postLiked',
+  'postCommented',
+  'eventRSVP',
 ];

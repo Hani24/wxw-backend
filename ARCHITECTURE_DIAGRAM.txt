@@ -1,0 +1,377 @@
+================================================================================
+DELIVERY DELIGHT - SYSTEM ARCHITECTURE DIAGRAM
+================================================================================
+
+CLIENTS & USERS
+├── Client (App Customer)
+│   ├── Browse Restaurants
+│   ├── Cart & Checkout
+│   ├── Order Placement
+│   ├── Payment (Stripe)
+│   ├── Delivery Tracking
+│   └── Rating & Feedback
+│
+├── Courier (Delivery Person)
+│   ├── Accept Orders
+│   ├── Update Delivery Status
+│   ├── Earnings Tracking
+│   └── Work Shifts
+│
+└── Restaurant Staff
+    ├── Owner/Manager
+    │   ├── Menu Management
+    │   ├── Order Management
+    │   ├── Employee Management
+    │   └── Analytics
+    │
+    └── Employee
+        ├── View Orders
+        └── Update Status
+
+                         ↓↓↓
+
+        EXPRESS.JS REST API (200+ Endpoints)
+        
+        ┌─────────────────────────────────────────┐
+        │  01.passport.middleware.js              │
+        │  (JWT Authentication)                   │
+        └─────────────────────────────────────────┘
+                         ↓
+        ┌─────────────────────────────────────────┐
+        │  02.access.middleware.js                │
+        │  (Role-Based Authorization)             │
+        └─────────────────────────────────────────┘
+                         ↓
+        ┌─────────────────────────────────────────┐
+        │  Express.auto-router.js                 │
+        │  (Convention-Based Routing)             │
+        └─────────────────────────────────────────┘
+                         ↓
+        ┌──────────────────────────────────────────────────────────┐
+        │  /src/routes/                                            │
+        ├────────────────────────────────────────────────────────┐
+        │ ├─ /private/                                            │
+        │ │  ├─ /admin/         (Admin operations)                │
+        │ │  ├─ /client/        (Customer operations)             │
+        │ │  ├─ /courier/       (Delivery operations)             │
+        │ │  ├─ /restaurant/    (Restaurant management)           │
+        │ │  └─ /common/        (All authenticated users)         │
+        │ │                                                        │
+        │ └─ /public/                                             │
+        │    ├─ /admin/        (Public admin: login)              │
+        │    ├─ /client/       (Public client: login/signup)      │
+        │    ├─ /restaurant/   (Public restaurant: discovery)     │
+        │    ├─ /guest/        (Guest checkout: no registration)  │
+        │    ├─ /dev/          (Development/testing endpoints)    │
+        │    └─ /info/         (Terms, privacy policy)            │
+        └──────────────────────────────────────────────────────────┘
+
+                         ↓↓↓
+
+        BUSINESS LOGIC SERVICES
+        
+        /src/services/
+        ├─ Payments/               (Stripe integration)
+        │  └─ stripe.item.js      (Payment processing, webhooks)
+        │
+        ├─ Firebase/              (Push notifications)
+        │  └─ Real-time messaging to devices
+        │
+        ├─ Mailer/               (Email service)
+        │  ├─ Account verification
+        │  ├─ Order confirmations
+        │  └─ Recovery emails
+        │
+        ├─ SMS/                  (SMS notifications)
+        │  ├─ Verification codes
+        │  └─ Order updates
+        │
+        ├─ JWT/                  (Token management)
+        │  ├─ Token creation
+        │  └─ Token validation
+        │
+        ├─ S3/                   (AWS S3 file storage)
+        │  ├─ User avatars
+        │  ├─ Restaurant logos
+        │  ├─ Menu item images
+        │  └─ Support documents
+        │
+        ├─ Geo/                  (Geolocation services)
+        │  ├─ Distance calculation
+        │  └─ Delivery fee calculation
+        │
+        ├─ BCrypt/               (Password hashing)
+        ├─ DT/                   (DateTime utilities)
+        ├─ Axi/                  (HTTP client)
+        └─ Tools/                (Utility functions)
+
+                         ↓↓↓
+
+        DATABASE LAYER (SEQUELIZE ORM)
+        
+        ┌──────────────────────────────────────────────────────────┐
+        │  /src/DB/                                                │
+        ├────────────────────────────────────────────────────────┐
+        │ ├─ /models/              (60+ Sequelize models)         │
+        │ │  ├─ User models       (User, Client, Courier, etc.)  │
+        │ │  ├─ Restaurant models (Restaurant, MenuItem, etc.)   │
+        │ │  ├─ Order models      (Order, OrderSupplier, etc.)   │
+        │ │  ├─ Payment models    (PaymentCard, etc.)            │
+        │ │  └─ ... (30+ more)                                   │
+        │ │                                                       │
+        │ ├─ /dicts/               (Enums & constants)           │
+        │ │  ├─ USER_ROLES        (client, courier, admin, etc.)│
+        │ │  ├─ ORDER_TYPES       (order-now, catering, etc.)   │
+        │ │  ├─ ORDER_STATUSES    (created, processing, etc.)   │
+        │ │  ├─ PAYMENT_TYPES     (Card, ApplePay, GooglePay)   │
+        │ │  └─ ... (20+ more)                                  │
+        │ │                                                       │
+        │ ├─ setUpForeignKeys.js  (Model relationships)          │
+        │ │  └─ User → Restaurant, Order → OrderSupplier, etc.  │
+        │ │                                                       │
+        │ ├─ /migrations/          (DB schema migrations)         │
+        │ └─ /seeders/             (Test data seeders)            │
+        └──────────────────────────────────────────────────────────┘
+
+                         ↓
+
+    ┌──────────────────────────────────────────────┐
+    │  MARIADB / MYSQL DATABASE                    │
+    │  (Production Data Store)                     │
+    ├──────────────────────────────────────────────┤
+    │  Tables:                                     │
+    │  ├─ Users              (Auth & profiles)    │
+    │  ├─ Restaurants        (Business data)      │
+    │  ├─ Orders             (Transaction data)   │
+    │  ├─ OrderSuppliers     (Multi-restaurant)   │
+    │  ├─ MenuItems          (Product catalog)    │
+    │  ├─ Payments           (Payment tracking)   │
+    │  ├─ Notifications      (Messaging)          │
+    │  └─ ... (60+ tables total)                 │
+    └──────────────────────────────────────────────┘
+
+================================================================================
+DATA FLOW EXAMPLES
+================================================================================
+
+SCENARIO 1: Customer Places Order
+                         
+  Client App
+    ↓
+  POST /private/client/orders/create/
+    ├─ Validate input (restaurantIds, addresses, etc.)
+    ├─ Create Order record
+    ├─ Create OrderSupplier for each restaurant
+    ├─ Calculate pricing (food + delivery + discount + fee)
+    ├─ Create OrderPaymentType, OrderDeliveryAddress, etc.
+    ├─ Send notifications to each restaurant
+    ├─ Return Order object with OrderSuppliers
+    ↓
+  POST /private/client/orders/confirm/
+    ├─ Call Stripe API (create payment intent)
+    ├─ Process payment
+    ├─ Update order.status = 'processing'
+    ├─ Update OrderSupplier.status = 'processing'
+    ├─ Send confirmation notifications
+    ├─ Restaurants receive notifications
+    ↓
+  Restaurant View Orders
+    ├─ GET /private/restaurant/orders/active/get/all
+    ├─ Display pending OrderSuppliers
+    ├─ Staff accepts order
+    ├─ POST /private/restaurant/order-requests/accept/
+    ├─ Update OrderSupplier.status = 'accepted'
+    ├─ Client gets notification
+    ↓
+  Courier Accepts Order
+    ├─ GET /private/courier/order-requests/get/all/
+    ├─ POST /private/courier/order-requests/accept/by/id/
+    ├─ Update Order.courierId = courierId
+    ├─ Update Order.status = 'assigned to courier'
+    ├─ Client & restaurant get notifications
+    ↓
+  Order Delivery
+    ├─ Courier picks up from restaurants
+    ├─ Courier delivers to client
+    ├─ POST /private/courier/orders/current/set-as-delivered/
+    ├─ Update Order.isDeliveredByCourier = true
+    ├─ Update Order.deliveredByCourierAt = now
+    ├─ Client gets delivery notification
+    ↓
+  Client Rating
+    ├─ POST /private/client/orders/rating/rate/by/id/
+    ├─ Update Order.courierRating, Order.orderRating
+    ├─ Update Courier.rating (average)
+    ├─ Update Restaurant.rating (average)
+    ├─ Restaurant gets notification
+    ↓
+  Complete
+
+================================================================================
+
+SCENARIO 2: Event Catering Order (On-Site Presence)
+
+  Client App
+    ↓
+  POST /private/client/orders/on-site-presence/estimate/
+    ├─ Input: {restaurantId, eventDate, numberOfPeople, numberOfHours}
+    ├─ Check RestaurantOrderTypeSettings (is catering enabled?)
+    ├─ Check RestaurantUnavailableDates (is date available?)
+    ├─ Calculate pricing based on model (per-person/hour/event)
+    ├─ Return price breakdown with service fee
+    ↓
+  POST /private/client/orders/on-site-presence/create/
+    ├─ Create Order with orderType = 'on-site-presence'
+    ├─ Create OrderOnSitePresenceDetails (event date, people count, hours)
+    ├─ Update Order.status = 'created'
+    ├─ Update OrderSupplier.status = 'awaiting acceptance'
+    ├─ Send notification to restaurant (24-hour deadline)
+    ↓
+  Restaurant Response (24-hour window)
+    ├─ GET /private/restaurant/orders/on-site-presence/pending/get/all
+    ├─ Review event details
+    ├─ Either:
+    │  ├─ Accept: POST /private/restaurant/orders/on-site-presence/accept/by/id/
+    │  │   └─ Update to 'processing'
+    │  └─ Reject: POST /private/restaurant/orders/on-site-presence/reject/by/id/
+    │      ├─ Update to 'rejected'
+    │      ├─ Refund client via Stripe
+    │      ├─ Send rejection notification
+    ↓
+  Auto-Reject if Timeout
+    ├─ Cron job (hourly): dev.order.auto-reject-expired...
+    ├─ Find orders awaiting acceptance > 24 hours
+    ├─ Auto-reject and refund
+    ↓
+  If Accepted: Event Preparation
+    ├─ Restaurant prepares catering
+    ├─ Follows OrderOnSitePresenceDetails requirements
+    └─ Delivers to event location
+
+================================================================================
+
+SCENARIO 3: Guest Checkout (No Registration Required)
+
+  Visitor (Anonymous User)
+    ↓
+  POST /public/guest/init
+    ├─ Create temporary User (guestToken = random string)
+    ├─ Create temporary Client
+    ├─ Create GuestSession (expires in 24 hours)
+    ├─ Return JWT token in response
+    ↓
+  Browse & Add to Cart (same as registered user)
+    ├─ GET /public/restaurant/find/all
+    ├─ GET /public/restaurant/menu-categories/...
+    ├─ POST /private/client/cart/set/amount/...
+    ↓
+  POST /private/client/orders/create/
+    ├─ Uses guest User ID & Client ID
+    ├─ Order created with guest flag
+    ↓
+  POST /public/guest/checkout/complete
+    ├─ Option 1: Complete as guest
+    │  ├─ Process payment with guest Stripe customer
+    │  ├─ Order finalized
+    │  ├─ Guest receives order updates via email/SMS
+    │
+    ├─ Option 2: Convert to registered user
+    │  ├─ Input: {email, password, phone}
+    │  ├─ Merge guest user data with new account
+    │  ├─ Create permanent User/Client
+    │  ├─ Migrate GuestSession to Session
+    │  ├─ Process payment as registered user
+    │  └─ Account activated
+    ↓
+  Cleanup
+    ├─ Cron job (daily @ 3 AM): dev.guest-sessions.cleanup...
+    ├─ Find expired GuestSessions (> 24 hours)
+    ├─ Delete temporary users/clients
+    └─ Keep converted users
+
+================================================================================
+
+KEY INTEGRATION POINTS
+================================================================================
+
+Stripe Payment Processing:
+  /src/services/payments/items/stripe.item.js
+  ├─ Create payment intent
+  ├─ Handle card payments
+  ├─ Process ApplePay/GooglePay
+  ├─ Handle webhook events (payment.succeeded, payment.failed)
+  └─ Manage guest customers (one customer per order)
+
+Firebase Push Notifications:
+  /src/services/firebase/
+  ├─ Register FCM tokens (POST /private/common/notifications/fcm/update)
+  ├─ Send notifications when:
+  │  ├─ Order status changes
+  │  ├─ Courier accepted/rejected
+  │  ├─ Payment confirmed/failed
+  │  ├─ Support ticket updated
+  │  └─ System announcements
+  └─ Track notification delivery
+
+AWS S3 File Storage:
+  /src/services/S3/
+  ├─ User avatars
+  ├─ Restaurant logos
+  ├─ Menu item images
+  ├─ Support ticket attachments
+  └─ URL generation for all image fields
+
+Email Notifications:
+  /src/services/Mailer/ (Nodemailer + Mailgun)
+  ├─ Account verification
+  ├─ Password recovery
+  ├─ Order confirmations
+  ├─ Delivery notifications
+  └─ Support responses
+
+SMS Notifications:
+  /src/services/sms/
+  ├─ Phone verification codes
+  ├─ Order status updates
+  └─ Urgent notifications
+
+================================================================================
+
+DEPLOYMENT ARCHITECTURE
+================================================================================
+
+Production Deployment:
+  
+  Load Balancer / Reverse Proxy (Nginx)
+         ↓
+  Node.js Application Server (PM2 managed)
+    ├─ cluster mode (multiple worker processes)
+    ├─ auto-restart on failure
+    ├─ hot reload capability
+    └─ monitoring & logging
+         ↓
+  MariaDB Database Cluster
+    ├─ Master/Slave replication
+    ├─ Automated backups
+    └─ Connection pooling
+         ↓
+  External Services
+    ├─ Stripe API (Payment processing)
+    ├─ Firebase (Push notifications)
+    ├─ AWS S3 (File storage)
+    ├─ Email service (Mailgun)
+    └─ SMS service
+
+Background Jobs (Cron):
+  ├─ Order auto-rejection (hourly)
+  └─ Guest session cleanup (daily @ 3 AM)
+
+Logging:
+  /logs/
+  ├─ debug.log   (Detailed debug info)
+  ├─ info.log    (General operations)
+  ├─ warn.log    (Warnings)
+  ├─ error.log   (Errors)
+  └─ access.log  (HTTP access logs)
+
+================================================================================

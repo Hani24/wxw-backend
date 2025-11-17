@@ -1,0 +1,377 @@
+================================================================================
+DELIVERY DELIGHT BACKEND - QUICK REFERENCE SUMMARY
+================================================================================
+
+PROJECT: Food Delivery Platform with Event Catering
+ROOT: /home/bakar/Workspace/deliverydelight/wxw-backend
+DOCUMENTATION: /CODEBASE_STRUCTURE_OVERVIEW.md (44KB comprehensive guide)
+
+================================================================================
+1. TECH STACK
+================================================================================
+Runtime:    Node.js 14+
+Framework:  Express.js 4.x
+Database:   MariaDB/MySQL (Sequelize ORM)
+Auth:       JWT + Passport.js
+Payment:    Stripe API
+Notifications: Firebase Cloud Messaging + SMS + Email
+Storage:    AWS S3
+Process Mgmt: PM2
+WebSockets: Socket.io
+
+================================================================================
+2. PROJECT STRUCTURE
+================================================================================
+src/
+├── Application.js           - Main bootstrap class
+├── DB/                      - Database layer (60+ models)
+│   ├── models/             - Sequelize models
+│   ├── migrations/         - DB migrations
+│   ├── dicts/              - Enums & constants
+│   └── setUpForeignKeys.js - Model relationships
+├── express/                - Express setup & middleware
+│   ├── 01.passport.middleware.js     - JWT auth
+│   ├── 02.access.middleware.js       - Role-based access
+│   └── express.auto-router.js        - Auto-routing
+├── routes/                 - 200+ API endpoints
+│   ├── private/           - Authenticated routes
+│   │   ├── admin/         - Admin operations
+│   │   ├── client/        - Customer operations
+│   │   ├── courier/       - Delivery personnel
+│   │   ├── restaurant/    - Restaurant management
+│   │   └── common/        - All authenticated users
+│   └── public/            - Public routes (login, signup, etc.)
+└── services/              - Business logic
+    ├── payments/          - Stripe integration
+    ├── firebase/          - Push notifications
+    ├── JWT/              - Token management
+    ├── Mailer/           - Email sending
+    ├── S3/               - File storage
+    └── ... (18+ services)
+
+================================================================================
+3. KEY MODELS (60+ total)
+================================================================================
+USER MODELS:
+  User, Session, Client, Courier, Manager, Employee
+  GuestSession (temporary users), EmailVerification, AccessRecovery
+
+RESTAURANT MODELS:
+  Restaurant, MenuCategory, MenuItem, CateringMenuItem
+  RestaurantWorkingTime, RestaurantOrderTypeSettings, RestaurantUnavailableDates
+  CuisineType, RestaurantNotification, RestaurantTransfer
+
+ORDER MODELS:
+  Order, OrderSupplier, OrderSupplierItem
+  OrderPaymentType, OrderDeliveryAddress, OrderDeliveryTime, OrderDeliveryType
+  OrderOnSitePresenceDetails, OrderCateringDetails
+
+CLIENT DATA:
+  DeliveryAddress, PaymentCard, ClientPaymentSettings
+  FavoriteMenuItem, Cart, CartItem, ClientNotification
+
+LOCATION:
+  State, City
+
+OTHER:
+  Upload, UserSettings, SupportTicket, Faq
+  TermsAndConditions, PrivacyPolicy, DiscountCode
+  CourierShift, CourierOrderRequest, CourierWithdrawRequest
+  Statistics models...
+
+================================================================================
+4. USER ROLES
+================================================================================
+client      - App customer (ordering, rating, payment)
+courier     - Delivery person (order pickup/delivery)
+restaurant  - Restaurant owner (full management)
+manager     - Restaurant manager (staff, menu, analytics)
+employee    - Restaurant staff (order management only)
+admin       - Platform admin (approvals, system config)
+root        - Super admin (full system access)
+
+================================================================================
+5. ORDER TYPES
+================================================================================
+order-now        - Regular food ordering (existing)
+on-site-presence - Event catering (service at venue)
+catering         - Full catering (menu selection + split payments)
+
+================================================================================
+6. API ROUTES ORGANIZATION
+================================================================================
+Route Structure: /src/routes/{public|private}/{role}/{resource}/{action}/index.js
+
+EXAMPLES:
+  /src/routes/private/client/orders/create/index.js
+    → POST /private/client/orders/create/
+
+  /src/routes/public/restaurant/find/all/index.js
+    → GET /public/restaurant/find/all/
+
+Authentication Flow:
+  1. Parse JWT token from Authorization header
+  2. Decode & verify signature
+  3. Load User/Session from database
+  4. Check role-based permissions
+  5. Load role-specific data (req.client, req.restaurant, etc.)
+
+Response Format (ALL endpoints):
+  {
+    success: true/false,
+    message: "Human-readable message",
+    data: { /* response payload */ }
+  }
+
+================================================================================
+7. KEY FEATURES
+================================================================================
+IMPLEMENTED:
+  ✓ Multi-restaurant orders in single checkout
+  ✓ Real-time order tracking & status updates
+  ✓ Courier assignment & delivery management
+  ✓ Menu management with categories
+  ✓ Favorite items & saved addresses
+  ✓ Cart with multiple restaurant items
+  ✓ Stripe payment integration
+  ✓ Multiple payment methods (Card, ApplePay, GooglePay)
+  ✓ Guest checkout (temp user for 24 hours)
+  ✓ Event catering with availability blocking
+  ✓ Order rating system (orders + couriers)
+  ✓ Support tickets
+  ✓ Push notifications (Firebase)
+  ✓ Email & SMS notifications
+  ✓ AWS S3 file storage
+  ✓ Analytics & statistics
+
+NOT IMPLEMENTED:
+  ✗ Social feeds / user posts
+  ✗ Comments / discussions
+  ✗ Direct messaging between users
+  ✗ User-to-user following
+  ✗ Public user profiles
+
+================================================================================
+8. AUTHENTICATION FLOW
+================================================================================
+Registration:
+  POST /public/client/login (new phone)
+  → Create User account
+  → Send email verification code
+  → User verifies email
+  → Account activated
+  → JWT token issued
+
+Login:
+  POST /public/client/login (existing phone + password)
+  → Verify credentials
+  → Create Session record
+  → Return JWT token
+
+Guest Checkout (No registration):
+  POST /public/guest/init
+  → Create temporary user (24-hour expiry)
+  → Create temporary client
+  → Return JWT token for session
+  → Browse restaurants, add to cart
+  → POST /public/guest/checkout/complete
+  → Convert to permanent user OR complete as guest
+
+JWT Token Structure:
+  {
+    userId: 123,
+    sessionId: 456,
+    role: 'client',
+    isGuest: false,
+    email: 'user@example.com',
+    phone: '1234567890',
+    exp: 1234567890
+  }
+
+================================================================================
+9. CLIENT-RESTAURANT INTERACTION MODEL
+================================================================================
+Client Flow:
+  1. Browse restaurants (GET /public/restaurant/find/all)
+  2. View menu (GET /public/restaurant/menu-categories/...)
+  3. Add items to cart (POST /private/client/cart/set/amount/...)
+  4. Create order (POST /private/client/orders/create/)
+     → System creates Order + OrderSupplier(s) for each restaurant
+  5. Confirm order (POST /private/client/orders/confirm/)
+     → Process Stripe payment
+  6. Track order (GET /private/client/orders/get/by/id/:orderId)
+     → See status from each restaurant + courier
+  7. Rate order & courier (POST /private/client/orders/rating/rate/by/id/)
+
+Multi-Restaurant Example:
+  Client orders from Restaurant A + Restaurant B in single checkout
+  → Order created with 2 OrderSuppliers
+  → Each restaurant receives notification independently
+  → Both restaurants prepare simultaneously
+  → Single courier picks up from both
+  → Courier delivers both to client
+  → Client rates both restaurants & courier separately
+
+Restaurant Flow:
+  1. Receive order notifications
+  2. View pending orders (GET /private/restaurant/order-requests/get/all)
+  3. Accept/reject order (POST /private/restaurant/order-requests/accept/...)
+  4. Update status to ready (POST /private/restaurant/orders/set-as-ready/...)
+  5. Courier picks up
+  6. View completed orders & ratings
+
+Event Catering Special Flow:
+  POST /private/client/orders/on-site-presence/estimate
+    → Calculate price based on date/people/hours
+  POST /private/client/orders/on-site-presence/create
+    → Restaurant has 24 hours to accept/reject
+    → If accepted → processing status
+    → If rejected or timeout → canceled + refund
+
+================================================================================
+10. PAYMENT PROCESSING
+================================================================================
+Integration: Stripe API
+Service: /src/services/payments/items/stripe.item.js
+
+Features:
+  ✓ Payment intent creation
+  ✓ Card processing
+  ✓ ApplePay/GooglePay support
+  ✓ Guest customer support
+  ✓ Webhook handling
+  ✓ Error retry logic
+
+Payment Flow:
+  POST /private/client/orders/confirm
+  → Create Stripe payment intent
+  → Charge customer
+  → Handle success/failure
+  → Update order status
+  → Send notifications
+
+Split Payments (Catering):
+  - 50% payment at order placement (10 days before event)
+  - 50% payment 3 days before event
+  - Non-refundable deposits
+
+================================================================================
+11. NOTIFICATIONS
+================================================================================
+Types:
+  • Order created/updated/delivered
+  • Courier accepted/rejected/delivered
+  • Payment confirmed/failed
+  • Support ticket updates
+  • System announcements
+  • Restaurant notifications
+
+Channels:
+  • Firebase Cloud Messaging (push notifications)
+  • Email (Nodemailer + Mailgun)
+  • SMS (SMS service)
+  • In-app notifications (stored in DB)
+
+Registration:
+  POST /private/common/notifications/fcm/update
+  → Register device FCM token
+  → Receive real-time push notifications
+
+================================================================================
+12. CRON JOBS
+================================================================================
+dev.order.auto-reject-expired-on-site-presence.job.js
+  - Runs hourly
+  - Auto-rejects event catering orders after 24-hour acceptance deadline
+  - Triggers refunds
+
+dev.guest-sessions.cleanup-expired.job.js
+  - Runs daily at 3 AM
+  - Deletes expired guest sessions (24-hour expiry)
+  - Cleans up temporary users
+
+================================================================================
+13. QUICK COMMANDS
+================================================================================
+Development:
+  npm run start:dev              # Nodemon with hot reload
+  npm run migrate:dev            # Run database migrations
+  npm run seed:dev               # Seed test data
+  npm run db:reset:dev           # Drop & recreate DB
+
+Production:
+  npm run pm2:dev                # PM2 process manager
+
+Testing:
+  See /ON_SITE_PRESENCE_POSTMAN_TEST_GUIDE.md
+  See /CATERING_POSTMAN_TEST_GUIDE.md
+
+================================================================================
+14. CRITICAL FILES (ABSOLUTE PATHS)
+================================================================================
+/home/bakar/Workspace/deliverydelight/wxw-backend/
+
+Application:
+  - index.js
+  - src/Application.js
+  - src/envs/dev/config.js
+
+Database:
+  - src/DB/models/
+  - src/DB/setUpForeignKeys.js
+  - src/DB/dicts/
+
+API Routes:
+  - src/routes/private/
+  - src/routes/public/
+
+Middleware:
+  - src/express/middlewares/middlewares/01.passport.middleware.js
+  - src/express/middlewares/middlewares/02.access.middleware.js
+
+Services:
+  - src/services/payments/items/stripe.item.js
+  - src/services/firebase/
+  - src/services/JWT/
+  - src/services/Mailer/
+
+================================================================================
+15. SOCIAL FEATURES STATUS
+================================================================================
+Current Status: NO SOCIAL FEATURES EXIST
+
+What Does NOT Exist:
+  ✗ User posts/feeds
+  ✗ Comments/discussions
+  ✗ Likes/reactions
+  ✗ User-to-user messaging
+  ✗ Public user profiles
+  ✗ Social following
+  ✗ Hashtags/trending
+  ✗ Stories
+
+What DOES Exist (Order-Related):
+  ✓ Order ratings (food quality, 0-5 stars)
+  ✓ Courier ratings (delivery performance, 0-5 stars)
+  ✓ Favorite items (bookmarking)
+  ✓ Support tickets (customer support)
+  ✓ One-way notifications (system → user)
+  ✓ Restaurant ratings (aggregated from orders)
+
+The platform is transactional (ordering, delivery, payment) NOT social.
+
+================================================================================
+DOCUMENTATION
+================================================================================
+Comprehensive Guide (44KB):
+  /CODEBASE_STRUCTURE_OVERVIEW.md
+
+Other Docs:
+  /ON_SITE_PRESENCE_POSTMAN_TEST_GUIDE.md
+  /CATERING_POSTMAN_TEST_GUIDE.md
+  /GUEST_FEATURE_QUICK_REFERENCE.md
+  /RESTAURANT_CUISINE_MANAGEMENT.md
+  /CURRENT_PRODUCTION_SCHEMA_REFERENCE.sql
+  /ANALYSIS_INDEX.md
+
+================================================================================

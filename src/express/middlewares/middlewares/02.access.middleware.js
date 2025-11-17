@@ -134,6 +134,11 @@ module.exports = ( App, express, name )=>{
           // /^\/private\/client\/payment/,  // REMOVED: Allow payment settings for guests
           /^\/private\/client\/favorite/,
           /^\/private\/client\/courier\/create/,
+          // News Feed - guests can view but not interact
+          /^\/private\/client\/news-feed\/like/,
+          /^\/private\/client\/news-feed\/comment/,
+          /^\/private\/client\/news-feed\/rsvp/,
+          /^\/private\/client\/restaurant\/follow/,
         ];
 
         if (guestBlockedPaths.some(pattern => pattern.test(req.path))) {

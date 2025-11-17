@@ -67,6 +67,14 @@ module.exports = async(App, params={})=>{
 
   const RestaurantTransfer = App.getModel('RestaurantTransfer');
 
+  const RestaurantPost = App.getModel('RestaurantPost');
+  const PostLike = App.getModel('PostLike');
+  const PostComment = App.getModel('PostComment');
+  const RestaurantFollow = App.getModel('RestaurantFollow');
+  const EventRSVP = App.getModel('EventRSVP');
+  const CommentLike = App.getModel('CommentLike');
+  const CommentReply = App.getModel('CommentReply');
+
 
   // [inner]
   // const ApiNode = App.getModel('ApiNode');
@@ -256,6 +264,40 @@ module.exports = async(App, params={})=>{
   Restaurant.hasMany(CartItem, { foreignKey: 'restaurantId' } );
   CartItem.belongsTo(MenuItem, { foreignKey: 'menuItemId' } );
   MenuItem.hasMany(CartItem, { foreignKey: 'menuItemId' } );
+
+  // [news-feed]
+  RestaurantPost.belongsTo(Restaurant, { foreignKey: 'restaurantId' } );
+  Restaurant.hasMany(RestaurantPost, { foreignKey: 'restaurantId', as: 'Posts' } );
+
+  PostLike.belongsTo(RestaurantPost, { foreignKey: 'postId' } );
+  RestaurantPost.hasMany(PostLike, { foreignKey: 'postId', as: 'Likes' } );
+  PostLike.belongsTo(Client, { foreignKey: 'clientId' } );
+  Client.hasMany(PostLike, { foreignKey: 'clientId', as: 'PostLikes' } );
+
+  PostComment.belongsTo(RestaurantPost, { foreignKey: 'postId' } );
+  RestaurantPost.hasMany(PostComment, { foreignKey: 'postId', as: 'Comments' } );
+  PostComment.belongsTo(Client, { foreignKey: 'clientId' } );
+  Client.hasMany(PostComment, { foreignKey: 'clientId', as: 'PostComments' } );
+
+  RestaurantFollow.belongsTo(Restaurant, { foreignKey: 'restaurantId' } );
+  Restaurant.hasMany(RestaurantFollow, { foreignKey: 'restaurantId', as: 'Followers' } );
+  RestaurantFollow.belongsTo(Client, { foreignKey: 'clientId' } );
+  Client.hasMany(RestaurantFollow, { foreignKey: 'clientId', as: 'FollowedRestaurants' } );
+
+  EventRSVP.belongsTo(RestaurantPost, { foreignKey: 'postId' } );
+  RestaurantPost.hasMany(EventRSVP, { foreignKey: 'postId', as: 'RSVPs' } );
+  EventRSVP.belongsTo(Client, { foreignKey: 'clientId' } );
+  Client.hasMany(EventRSVP, { foreignKey: 'clientId', as: 'EventRSVPs' } );
+
+  CommentLike.belongsTo(PostComment, { foreignKey: 'commentId' } );
+  PostComment.hasMany(CommentLike, { foreignKey: 'commentId', as: 'Likes' } );
+  CommentLike.belongsTo(User, { foreignKey: 'userId' } );
+  User.hasMany(CommentLike, { foreignKey: 'userId', as: 'CommentLikes' } );
+
+  CommentReply.belongsTo(PostComment, { foreignKey: 'commentId' } );
+  PostComment.hasMany(CommentReply, { foreignKey: 'commentId', as: 'Replies' } );
+  CommentReply.belongsTo(User, { foreignKey: 'userId' } );
+  User.hasMany(CommentReply, { foreignKey: 'userId', as: 'CommentReplies' } );
 
 
   // for( const modelName of Object.keys(App.DB.models) ){

@@ -36,6 +36,15 @@ module.exports = (App, params={})=>{
     },
     'dev.statistic.collect-daily-restaurants-orders-info': {
       debug: false,
-    },    
+    },
+    'dev.guest-sessions.cleanup-expired': {
+      debug: false,
+    },
+    'dev.order.auto-reject-expired-on-site-presence': {
+      debug: false,
+    },
+    'dev.order.auto-cancel-unaccepted': {
+      debug: false, // Set to true to see detailed logs for debugging
+    },
   };
 };
