@@ -6,6 +6,8 @@ const router = express.Router();
 // - offset (optional, default: 0)
 // - limit (optional, default: 20, max: 50)
 // - filter (optional: 'all', 'today-events', 'upcoming-events')
+//
+// Note: Only shows posts from the last 30 days
 
 module.exports = function(App, RPath){
 
@@ -27,9 +29,15 @@ module.exports = function(App, RPath){
       });
       const followedRestaurantIds = followedRestaurants.map(f => f.restaurantId);
 
+      // Only show posts from the last 30 days
+      const thirtyDaysAgo = App.DT.moment().subtract(30, 'days').toDate();
+
       let whereClause = {
         isPublished: true,
-        isDeleted: false
+        isDeleted: false,
+        publishedAt: {
+          [App.DB.Op.gte]: thirtyDaysAgo
+        }
       };
 
       let orderClause = [['publishedAt', 'DESC']];
@@ -213,6 +221,11 @@ module.exports = function(App, RPath){
             going: 0,
             not_going: 0
           };
+        }
+
+        // Add isFollowedByClient flag to Restaurant
+        if (postJson.Restaurant) {
+          postJson.Restaurant.isFollowedByClient = followedRestaurantIds.includes(postJson.Restaurant.id);
         }
 
         return postJson;

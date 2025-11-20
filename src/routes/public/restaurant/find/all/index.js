@@ -45,7 +45,17 @@ module.exports = function(App, RPath){
 
       console.json({mUser});
       console.json({mClient});
-      
+
+      // Get followed restaurants for the client (if logged in)
+      let followedRestaurantIds = [];
+      if (mClient && App.isPosNumber(mClient.id)) {
+        const followedRestaurants = await App.getModel('RestaurantFollow').findAll({
+          where: { clientId: mClient.id },
+          attributes: ['restaurantId']
+        });
+        followedRestaurantIds = followedRestaurants.map(f => f.restaurantId);
+      }
+
       // Initialize search coordinates to null
       let searchCoords = null;
       
@@ -258,6 +268,7 @@ module.exports = function(App, RPath){
             lat: restaurant.lat,
             lon: restaurant.lon,
             isOpen: restaurant.isOpen === 1,
+            isFollowedByClient: followedRestaurantIds.includes(restaurant.id),
             MenuCategories: categories,
             CuisineTypes: cuisineTypes.map(ct => ({
               id: ct.id,
@@ -412,6 +423,9 @@ module.exports = function(App, RPath){
                   mRestaurant.dataValues.distanceType = 'mile';
                 }
               }
+
+              // Add isFollowedByClient flag
+              mRestaurant.dataValues.isFollowedByClient = followedRestaurantIds.includes(mRestaurant.id);
             }
           }
         }
