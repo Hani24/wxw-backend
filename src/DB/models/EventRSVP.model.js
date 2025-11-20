@@ -53,7 +53,8 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     }
 
     // Check if post exists and is an event
-    const post = await App.getModel('RestaurantPost').findByPk(postId);
+    const RestaurantPost = App.getModel('RestaurantPost');
+    const post = await RestaurantPost.findByPk(postId);
     if (!post) {
       return { success: false, message: 'Post not found' };
     }
@@ -66,15 +67,29 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       where: { postId, clientId }
     });
 
+    const oldStatus = existingRSVP ? existingRSVP.status : null;
+
     if (existingRSVP) {
       // Update existing RSVP
       await existingRSVP.update({ status });
-      return { success: true, status: status };
     } else {
       // Create new RSVP
       await Model.create({ postId, clientId, status });
-      return { success: true, status: status };
     }
+
+    // Update totalRSVPs count based on status changes
+    const oldCountsTowardTotal = oldStatus === 'interested' || oldStatus === 'going';
+    const newCountsTowardTotal = status === 'interested' || status === 'going';
+
+    if (!oldCountsTowardTotal && newCountsTowardTotal) {
+      // New RSVP or changing from 'not-going' to 'interested'/'going'
+      await RestaurantPost.incrementRSVPs(postId);
+    } else if (oldCountsTowardTotal && !newCountsTowardTotal) {
+      // Changing from 'interested'/'going' to 'not-going'
+      await RestaurantPost.decrementRSVPs(postId);
+    }
+
+    return { success: true, status: status };
   };
 
   /**
@@ -85,10 +100,13 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       return { success: false, message: 'Invalid parameters' };
     }
 
+    postId = Math.floor(+postId);
+    clientId = Math.floor(+clientId);
+
     const rsvp = await Model.findOne({
       where: {
-        postId: Math.floor(+postId),
-        clientId: Math.floor(+clientId)
+        postId: postId,
+        clientId: clientId
       }
     });
 
@@ -96,7 +114,15 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       return { success: false, message: 'RSVP not found' };
     }
 
+    const oldStatus = rsvp.status;
     await rsvp.destroy();
+
+    // Update totalRSVPs count if the removed RSVP was 'interested' or 'going'
+    if (oldStatus === 'interested' || oldStatus === 'going') {
+      const RestaurantPost = App.getModel('RestaurantPost');
+      await RestaurantPost.decrementRSVPs(postId);
+    }
+
     return { success: true };
   };
 

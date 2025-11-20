@@ -50,7 +50,7 @@ module.exports = function(App, RPath){
       }
 
       // If user follows restaurants, show posts from followed + nearby
-      // If no follows, show only nearby restaurants (within 20km)
+      // If no follows, show only nearby restaurants (within 30 miles)
       let restaurantFilter = {};
 
       if (followedRestaurantIds.length > 0) {
@@ -71,11 +71,13 @@ module.exports = function(App, RPath){
         const nearbyRestaurantIds = nearbyRestaurants
           .filter(restaurant => {
             if (!mClient.lat || !mClient.lon) return false;
-            const distance = App.geo.tools.getDistance(
-              mClient.lat, mClient.lon,
-              restaurant.lat, restaurant.lon
+            const distanceRes = App.geo.lib.getDistance(
+              { lat: mClient.lat, lon: mClient.lon },
+              { lat: restaurant.lat, lon: restaurant.lon },
+              'miles'
             );
-            return distance <= 20; // 20km radius
+            if (!distanceRes.success) return false;
+            return distanceRes.data.distance <= 30; // 30 miles radius
           })
           .map(r => r.id);
 
@@ -105,11 +107,13 @@ module.exports = function(App, RPath){
         const nearbyRestaurantIds = nearbyRestaurants
           .filter(restaurant => {
             if (!mClient.lat || !mClient.lon) return false;
-            const distance = App.geo.tools.getDistance(
-              mClient.lat, mClient.lon,
-              restaurant.lat, restaurant.lon
+            const distanceRes = App.geo.lib.getDistance(
+              { lat: mClient.lat, lon: mClient.lon },
+              { lat: restaurant.lat, lon: restaurant.lon },
+              'miles'
             );
-            return distance <= 20; // 20km radius
+            if (!distanceRes.success) return false;
+            return distanceRes.data.distance <= 30; // 30 miles radius
           })
           .map(r => r.id);
 
@@ -167,13 +171,48 @@ module.exports = function(App, RPath){
         rsvpMap[rsvp.postId] = rsvp.status;
       });
 
+      // Get RSVP counts for all event posts
+      const eventPostIds = posts.rows.filter(p => p.postType === 'event').map(p => p.id);
+      const allRsvps = await App.getModel('EventRSVP').findAll({
+        where: {
+          postId: {
+            [App.DB.Op.in]: eventPostIds
+          }
+        },
+        attributes: ['postId', 'status']
+      });
+
+      // Build RSVP counts map
+      const rsvpCountsMap = {};
+      allRsvps.forEach(rsvp => {
+        if (!rsvpCountsMap[rsvp.postId]) {
+          rsvpCountsMap[rsvp.postId] = {
+            interested: 0,
+            going: 0,
+            not_going: 0
+          };
+        }
+        if (rsvp.status === 'interested') {
+          rsvpCountsMap[rsvp.postId].interested++;
+        } else if (rsvp.status === 'going') {
+          rsvpCountsMap[rsvp.postId].going++;
+        } else if (rsvp.status === 'not-going') {
+          rsvpCountsMap[rsvp.postId].not_going++;
+        }
+      });
+
       // Enhance posts with like status and RSVP status
       const enhancedPosts = posts.rows.map(post => {
         const postJson = post.toJSON();
         postJson.isLikedByMe = likedPostIds.has(post.id);
 
         if (post.postType === 'event') {
-          postJson.myRSVPStatus = rsvpMap[post.id] || null;
+          postJson.clientRSVPStatus = rsvpMap[post.id] || null;
+          postJson.rsvpCounts = rsvpCountsMap[post.id] || {
+            interested: 0,
+            going: 0,
+            not_going: 0
+          };
         }
 
         return postJson;

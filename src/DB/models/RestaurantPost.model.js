@@ -63,6 +63,9 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     totalComments: {
       type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0,
     },
+    totalRSVPs: {
+      type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0,
+    },
     // Visibility & Status
     isPublished: {
       type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true,
@@ -200,6 +203,50 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     const post = await Model.findByPk(Math.floor(+postId));
     if (!post) return false;
     await post.update({ totalComments: Math.max(0, post.totalComments - 1) });
+    return true;
+  };
+
+  /**
+   * Increment RSVP count
+   */
+  Model.incrementRSVPs = async function (postId) {
+    if (!App.isPosNumber(Math.floor(+postId))) return false;
+    const post = await Model.findByPk(Math.floor(+postId));
+    if (!post) return false;
+    await post.update({ totalRSVPs: post.totalRSVPs + 1 });
+    return true;
+  };
+
+  /**
+   * Decrement RSVP count
+   */
+  Model.decrementRSVPs = async function (postId) {
+    if (!App.isPosNumber(Math.floor(+postId))) return false;
+    const post = await Model.findByPk(Math.floor(+postId));
+    if (!post) return false;
+    await post.update({ totalRSVPs: Math.max(0, post.totalRSVPs - 1) });
+    return true;
+  };
+
+  /**
+   * Recalculate total RSVPs from EventRSVP table
+   */
+  Model.recalculateTotalRSVPs = async function (postId) {
+    if (!App.isPosNumber(Math.floor(+postId))) return false;
+    const post = await Model.findByPk(Math.floor(+postId));
+    if (!post || post.postType !== 'event') return false;
+
+    const EventRSVP = App.getModel('EventRSVP');
+    const count = await EventRSVP.count({
+      where: {
+        postId: Math.floor(+postId),
+        status: {
+          [App.DB.Op.in]: ['interested', 'going']
+        }
+      }
+    });
+
+    await post.update({ totalRSVPs: count });
     return true;
   };
 
