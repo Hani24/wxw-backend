@@ -301,6 +301,21 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
           ],
         },
         {
+          required: false, // Optional - only for catering orders
+          model: App.getModel('OrderCateringDetails'),
+          as: 'OrderCateringDetails',
+          attributes: [
+            'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+            'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
+            'estimatedTotalPeople', 'specialRequests',
+            'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+            'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+            'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
+            'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+            'acceptanceDeadline',
+          ],
+        },
+        {
           required: true,
           model: App.getModel('OrderSupplier'),
           where: {
@@ -364,9 +379,9 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
 
 [history]: [
   <Order>: {
-    'id', 'status','totalPrice','totalItems',
+    'id', 'status','orderType','totalPrice','totalItems',
     'isDeliveredByCourier', 'deliveredByCourierAt',
-    'isCourierRatedByClient', 'courierRatedByClientAt', 
+    'isCourierRatedByClient', 'courierRatedByClientAt',
     'courierRating',
     'isOrderRatedByClient', 'orderRatedByClientAt',
     'isRejectedByClient', 'rejectedByClientAt', 'rejectionReason',
@@ -381,6 +396,23 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       <User>: {
         'id','phone','gender','image','firstName','lastName',
       }
+    },
+    <OrderOnSitePresenceDetails>: { // Optional - only present for on-site orders
+      'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+      'numberOfPeople', 'numberOfHours', 'specialRequests',
+      'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+      'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+      'acceptanceDeadline',
+    },
+    <OrderCateringDetails>: { // Optional - only present for catering orders
+      'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+      'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
+      'estimatedTotalPeople', 'specialRequests',
+      'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+      'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+      'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
+      'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
+      'acceptanceDeadline',
     },
     <OrderSupplier>: {
       'id','restaurantId','totalPrice','totalItems',

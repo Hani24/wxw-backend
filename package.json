@@ -29,6 +29,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "@googlemaps/google-maps-services-js": "^3.3.16",
     "ansi-regex": "^6.0.1",
     "async": "^3.2.3",

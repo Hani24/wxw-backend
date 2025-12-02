@@ -98,7 +98,6 @@ module.exports = function(App, RPath){
 
         await transaction.commit();
 
-        // TODO: Send notification to client about acceptance
         // TODO: Consider confirming the Stripe payment intent here
 
         await App.json(res, true, App.t(['Order accepted successfully'], req.lang), {
@@ -107,6 +106,51 @@ module.exports = function(App, RPath){
           status: 'processing',
           acceptedAt: details.restaurantAcceptedAt,
         });
+
+        // Send email notification to client asynchronously (don't block response)
+        (async () => {
+          try {
+            if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+              // Fetch client with user details (include isGuest for validation)
+              const mOrderWithClient = await App.getModel('Order').findByPk(mOrder.id, {
+                include: [{
+                  model: App.getModel('Client'),
+                  required: true,
+                  include: [{
+                    model: App.getModel('User'),
+                    attributes: ['email', 'fullName', 'firstName', 'isGuest']
+                  }]
+                }]
+              });
+
+              if (mOrderWithClient && mOrderWithClient.Client && mOrderWithClient.Client.User) {
+                const clientUser = mOrderWithClient.Client.User;
+
+                // Validate email recipient (skip guest users and invalid emails)
+                const validation = App.BrevoMailer.validateEmailRecipient(clientUser);
+                if (!validation.isValid) {
+                  console.warn(` #OrderAccepted: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                  return;
+                }
+
+                await App.BrevoMailer.sendOrderNotification({
+                  to: validation.email,
+                  clientName: clientUser.fullName || clientUser.firstName,
+                  orderId: mOrder.id,
+                  type: 'accepted',
+                  data: {
+                    restaurantName: mRestaurant.name,
+                    eventDate: details.eventDate,
+                    orderType: mOrder.orderType
+                  }
+                });
+                console.ok(` #OrderAccepted: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+              }
+            }
+          } catch (emailError) {
+            console.error(` #OrderAccepted: Failed to send email notification: ${emailError.message}`);
+          }
+        })();
 
       }catch(err){
         await transaction.rollback();

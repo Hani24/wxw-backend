@@ -234,7 +234,8 @@ module.exports = function(App, RPath){
 
           // Query order type settings for this restaurant
           const [orderTypeSettings] = await App.DB.sequelize.query(`
-            SELECT orderType, isEnabled, pricingModel, pricePerPerson, pricePerHour, basePrice
+            SELECT orderType, isEnabled, pricingModel, pricePerPerson, pricePerHour, basePrice,
+                   daysRequiredToPrepareOnSitePresence, daysRequiredToPrepareCatering
             FROM RestaurantOrderTypeSettings
             WHERE restaurantId = ${restaurant.id}
             AND isEnabled = true
@@ -283,6 +284,11 @@ module.exports = function(App, RPath){
               pricePerPerson: ots.pricePerPerson ? parseFloat(ots.pricePerPerson) : null,
               pricePerHour: ots.pricePerHour ? parseFloat(ots.pricePerHour) : null,
               basePrice: ots.basePrice ? parseFloat(ots.basePrice) : null,
+              daysRequiredToPrepare: ots.orderType === 'on-site-presence'
+                ? (ots.daysRequiredToPrepareOnSitePresence || 0)
+                : ots.orderType === 'catering'
+                  ? (ots.daysRequiredToPrepareCatering || 0)
+                  : 0,
             })),
             unavailableDates: unavailableDates.map(ud => ({
               date: ud.unavailableDate,
@@ -376,7 +382,7 @@ module.exports = function(App, RPath){
                   restaurantId: mRestaurant.id,
                   isEnabled: true,
                 },
-                attributes: ['orderType', 'pricingModel', 'pricePerPerson', 'pricePerHour', 'basePrice'],
+                attributes: ['orderType', 'pricingModel', 'pricePerPerson', 'pricePerHour', 'basePrice', 'daysRequiredToPrepareOnSitePresence', 'daysRequiredToPrepareCatering'],
               });
 
               // Add supported order types to restaurant data
@@ -386,6 +392,11 @@ module.exports = function(App, RPath){
                 pricePerPerson: ots.pricePerPerson ? parseFloat(ots.pricePerPerson) : null,
                 pricePerHour: ots.pricePerHour ? parseFloat(ots.pricePerHour) : null,
                 basePrice: ots.basePrice ? parseFloat(ots.basePrice) : null,
+                daysRequiredToPrepare: ots.orderType === 'on-site-presence'
+                  ? (ots.daysRequiredToPrepareOnSitePresence || 0)
+                  : ots.orderType === 'catering'
+                    ? (ots.daysRequiredToPrepareCatering || 0)
+                    : 0,
               }));
 
               // Get unavailable dates for this restaurant (next 90 days)

@@ -74,6 +74,18 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       allowNull: false,
       defaultValue: 15.00,
     },
+    daysRequiredToPrepareOnSitePresence: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Number of days required to prepare on-site-presence orders',
+    },
+    daysRequiredToPrepareCatering: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Number of days required to prepare catering orders',
+    },
   });
 
   // Static Methods
@@ -122,6 +134,71 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
   Model.isOrderTypeEnabled = async function(restaurantId, orderType){
     const settings = await Model.getByRestaurantIdAndType(restaurantId, orderType);
     return settings && settings.isEnabled === true;
+  };
+
+  /**
+   * Get days required to prepare for a specific order type
+   * @param {number} restaurantId
+   * @param {string} orderType - 'on-site-presence' or 'catering'
+   * @returns {Promise<number>} - Number of days required
+   */
+  Model.getDaysRequiredToPrepare = async function(restaurantId, orderType){
+    const settings = await Model.findOne({
+      where: {
+        restaurantId,
+        orderType,
+        isEnabled: true,
+      }
+    });
+
+    if(!settings){
+      return 0;
+    }
+
+    if(orderType === 'on-site-presence'){
+      return settings.daysRequiredToPrepareOnSitePresence || 0;
+    } else if(orderType === 'catering'){
+      return settings.daysRequiredToPrepareCatering || 0;
+    }
+
+    return 0;
+  };
+
+  /**
+   * Check if an event date meets the required preparation days
+   * @param {number} restaurantId
+   * @param {string} orderType - 'on-site-presence' or 'catering'
+   * @param {string} eventDate - YYYY-MM-DD format
+   * @returns {Promise<{success: boolean, message: string, daysRequired: number, daysUntilEvent: number}>}
+   */
+  Model.checkPreparationTimeRequirement = async function(restaurantId, orderType, eventDate){
+    const daysRequired = await Model.getDaysRequiredToPrepare(restaurantId, orderType);
+
+    // Calculate days until event
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const eventDateTime = new Date(eventDate);
+    eventDateTime.setHours(0, 0, 0, 0);
+
+    const millisecondsPerDay = 1000 * 60 * 60 * 24;
+    const daysUntilEvent = Math.floor((eventDateTime - today) / millisecondsPerDay);
+
+    if(daysUntilEvent < daysRequired){
+      return {
+        success: false,
+        message: `This restaurant requires ${daysRequired} days advance notice for ${orderType} orders. Your event is only ${daysUntilEvent} days away.`,
+        daysRequired,
+        daysUntilEvent
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Preparation time requirement met',
+      daysRequired,
+      daysUntilEvent
+    };
   };
 
   /**

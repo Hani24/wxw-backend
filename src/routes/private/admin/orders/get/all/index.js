@@ -152,6 +152,24 @@ module.exports = function(App, RPath){
         });
       }
 
+      // Add catering details if filtering by catering order type
+      if(orderTypeFilter === 'catering') {
+        include.push({
+          required: false,
+          model: App.getModel('OrderCateringDetails'),
+          as: 'OrderCateringDetails',
+          attributes: [
+            'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+            'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
+            'estimatedTotalPeople', 'specialRequests',
+            'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+            'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+            'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
+            'acceptanceDeadline', 'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason'
+          ],
+        });
+      }
+
       const mOrders = await App.getModel('Order').findAndCountAll({
         where,
         distinct: true,

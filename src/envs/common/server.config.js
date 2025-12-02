@@ -49,7 +49,7 @@ module.exports = (params = {}) => {
     mainServices: [
       'i18n', 'DT', 'JWT', 'BCrypt', 'tools',
       'geoip', 'RSA', 'logger', 'S3', 'multer',
-      'Push', 'payments', 'geo', 'Mailer', 'dev',
+      'Push', 'payments', 'geo', 'Mailer', 'BrevoMailer', 'dev',
     ],
     socketServer: {
       enabled: true, // nodes.master.enabled, 

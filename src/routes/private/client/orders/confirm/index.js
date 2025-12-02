@@ -505,6 +505,60 @@ module.exports = function(App, RPath){
 
         await App.json( res, true, App.t(['Order has been confirmed and paid'], res.lang), orderDetails );
 
+        // Send email notification to client asynchronously (don't block response)
+        (async () => {
+          try {
+            if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+              // Validate email recipient (skip if no valid email)
+              const validation = App.BrevoMailer.validateEmailRecipient(mUser);
+              if (!validation.isValid) {
+                console.warn(` #OrderConfirmed: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                return;
+              }
+
+              // Get restaurant name for the email
+              let restaurantName = 'Restaurant';
+              if (mOrder.OrderSuppliers && mOrder.OrderSuppliers.length > 0) {
+                const mRestaurant = await App.getModel('Restaurant').findByPk(mOrder.OrderSuppliers[0].restaurantId);
+                if (mRestaurant) {
+                  restaurantName = mRestaurant.name;
+                }
+              }
+
+              // Determine order type for email
+              let orderTypeText = 'order-now';
+              let eventDate = null;
+              if (isOnSitePresence) {
+                orderTypeText = 'on-site-presence';
+                if (orderDetails.onSitePresenceDetails) {
+                  eventDate = orderDetails.onSitePresenceDetails.eventDate;
+                }
+              } else if (isCatering) {
+                orderTypeText = 'catering';
+                if (orderDetails.cateringDetails) {
+                  eventDate = orderDetails.cateringDetails.eventDate;
+                }
+              }
+
+              await App.BrevoMailer.sendOrderNotification({
+                to: validation.email,
+                clientName: mUser.fullName || mUser.firstName,
+                orderId: mOrder.id,
+                type: 'created',
+                data: {
+                  orderType: orderTypeText,
+                  restaurantName: restaurantName,
+                  totalPrice: mOrder.finalPrice.toFixed(2),
+                  eventDate: eventDate
+                }
+              });
+              console.ok(` #OrderConfirmed: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+            }
+          } catch (emailError) {
+            console.error(` #OrderConfirmed: Failed to send email notification: ${emailError.message}`);
+          }
+        })();
+
       }else{
 
         // push to client for (ApplePay && GooglePay confirmation)

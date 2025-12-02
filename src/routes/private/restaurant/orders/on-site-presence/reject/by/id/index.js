@@ -128,8 +128,7 @@ module.exports = function(App, RPath){
 
         await transaction.commit();
 
-        // TODO: Send notification to client about rejection with reason
-        // TODO: Send email with refund confirmation
+        const wasRefunded = mOrder.status === statuses['refunded'];
 
         await App.json(res, true, App.t(['Order rejected successfully'], req.lang), {
           orderId: mOrder.id,
@@ -137,8 +136,54 @@ module.exports = function(App, RPath){
           status: mOrder.status,
           rejectedAt: details.restaurantRejectedAt,
           rejectionReason: details.rejectionReason,
-          refundProcessed: mOrder.status === statuses['refunded'],
+          refundProcessed: wasRefunded,
         });
+
+        // Send email notification to client asynchronously (don't block response)
+        (async () => {
+          try {
+            if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+              // Fetch client with user details (include isGuest for validation)
+              const mOrderWithClient = await App.getModel('Order').findByPk(mOrder.id, {
+                include: [{
+                  model: App.getModel('Client'),
+                  required: true,
+                  include: [{
+                    model: App.getModel('User'),
+                    attributes: ['email', 'fullName', 'firstName', 'isGuest']
+                  }]
+                }]
+              });
+
+              if (mOrderWithClient && mOrderWithClient.Client && mOrderWithClient.Client.User) {
+                const clientUser = mOrderWithClient.Client.User;
+
+                // Validate email recipient (skip guest users and invalid emails)
+                const validation = App.BrevoMailer.validateEmailRecipient(clientUser);
+                if (!validation.isValid) {
+                  console.warn(` #OrderRejected: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                  return;
+                }
+
+                await App.BrevoMailer.sendOrderNotification({
+                  to: validation.email,
+                  clientName: clientUser.fullName || clientUser.firstName,
+                  orderId: mOrder.id,
+                  type: 'rejected',
+                  data: {
+                    restaurantName: mRestaurant.name,
+                    rejectionReason: rejectionReason,
+                    refundAmount: wasRefunded ? mOrder.finalPrice.toFixed(2) : null,
+                    isRefunded: wasRefunded
+                  }
+                });
+                console.ok(` #OrderRejected: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+              }
+            }
+          } catch (emailError) {
+            console.error(` #OrderRejected: Failed to send email notification: ${emailError.message}`);
+          }
+        })();
 
       }catch(err){
         await transaction.rollback();

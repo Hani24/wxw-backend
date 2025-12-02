@@ -80,6 +80,16 @@ module.exports = function(App, RPath){
       if(!isDateAvailable)
         return App.json(res, 417, App.t(['Selected date is not available for this restaurant'], req.lang));
 
+      // Check if the restaurant's preparation time requirement is met
+      const preparationCheck = await App.getModel('RestaurantOrderTypeSettings').checkPreparationTimeRequirement(
+        restaurantId,
+        'on-site-presence',
+        eventDate
+      );
+
+      if(!preparationCheck.success)
+        return App.json(res, 417, App.t([preparationCheck.message], req.lang));
+
       // Get statuses and order types for later use
       const statuses = App.getModel('Order').getStatuses();
       const orderTypes = App.getModel('Order').getOrderTypes();
@@ -250,6 +260,36 @@ module.exports = function(App, RPath){
         await mClient.update({
           totalOrders: (mClient.totalOrders + 1),
         });
+
+        // Send email notification to client asynchronously (don't block response)
+        (async () => {
+          try {
+            if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+              // Validate email recipient (skip guest users and invalid emails)
+              const validation = App.BrevoMailer.validateEmailRecipient(mUser);
+              if (!validation.isValid) {
+                console.warn(` #OrderCreated: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                return;
+              }
+
+              await App.BrevoMailer.sendOrderNotification({
+                to: validation.email,
+                clientName: mUser.fullName || mUser.firstName,
+                orderId: mOrder.id,
+                type: 'created',
+                data: {
+                  orderType: 'on-site-presence',
+                  restaurantName: mRestaurant.name,
+                  totalPrice: mOrder.finalPrice.toFixed(2),
+                  eventDate: eventDate
+                }
+              });
+              console.ok(` #OrderCreated: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+            }
+          } catch (emailError) {
+            console.error(` #OrderCreated: Failed to send email notification: ${emailError.message}`);
+          }
+        })();
 
       } catch(e) {
         console.error(e);

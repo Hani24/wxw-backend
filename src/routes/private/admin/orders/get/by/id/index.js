@@ -116,6 +116,20 @@ module.exports = function(App, RPath){
               'acceptanceDeadline', 'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason'
             ],
           },
+          {
+            required: false,
+            model: App.getModel('OrderCateringDetails'),
+            as: 'OrderCateringDetails',
+            attributes: [
+              'id', 'eventDate', 'eventStartTime', 'eventEndTime',
+              'deliveryMethod', 'deliveryAddress', 'deliveryLatitude', 'deliveryLongitude',
+              'estimatedTotalPeople', 'specialRequests',
+              'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+              'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+              'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
+              'acceptanceDeadline', 'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason'
+            ],
+          },
         ]
       });
 

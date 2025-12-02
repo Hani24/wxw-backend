@@ -34,6 +34,8 @@ module.exports = function(App, RPath){
         minHours: s.minHours,
         maxHours: s.maxHours,
         serviceFeePercentage: s.serviceFeePercentage ? parseFloat(s.serviceFeePercentage) : 15.00,
+        daysRequiredToPrepareOnSitePresence: s.daysRequiredToPrepareOnSitePresence || 0,
+        daysRequiredToPrepareCatering: s.daysRequiredToPrepareCatering || 0,
       }));
 
       await App.json(res, true, App.t(['success'], req.lang), {

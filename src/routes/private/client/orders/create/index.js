@@ -420,6 +420,38 @@ console.log("order create data: ", data);
       console.json({ create: mOrder });
       await App.json(res, true, App.t('success', res.lang), mOrder);
 
+      // Send email notification to client asynchronously (don't block response)
+      (async () => {
+        try {
+          if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+            // Validate email recipient (skip guest users and invalid emails)
+            const validation = App.BrevoMailer.validateEmailRecipient(mUser);
+            if (!validation.isValid) {
+              console.warn(` #OrderCreated: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+              return;
+            }
+
+            // Get restaurant name (since we only allow one restaurant per order now)
+            const restaurantName = mRestaurants.length > 0 ? mRestaurants[0].name : 'Restaurant';
+
+            await App.BrevoMailer.sendOrderNotification({
+              to: validation.email,
+              clientName: mUser.fullName || mUser.firstName,
+              orderId: mOrder.id,
+              type: 'created',
+              data: {
+                orderType: 'order-now',
+                restaurantName: restaurantName,
+                totalPrice: mOrder.finalPrice.toFixed(2)
+              }
+            });
+            console.ok(` #OrderCreated: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+          }
+        } catch (emailError) {
+          console.error(` #OrderCreated: Failed to send email notification: ${emailError.message}`);
+        }
+      })();
+
       // [post-processing]: default order meta-data
       // const isEmpty = await App.getModel('Cart').emptyByClientId(mClient.id);
 

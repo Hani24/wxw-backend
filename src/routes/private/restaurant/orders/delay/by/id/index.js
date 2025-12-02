@@ -135,6 +135,52 @@ module.exports = function(App, RPath){
       const updateOrder = await mOrder.update({ expectedDeliveryTime });
       await App.json( res, true, App.t(['Order has been delayed for', delay,'min.'], res.lang) );
 
+      // Send email notification to client asynchronously (don't block response)
+      (async () => {
+        try {
+          if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+            // Fetch complete order with client/user details
+            const mOrderWithDetails = await App.getModel('Order').findByPk(mOrder.id, {
+              include: [{
+                model: App.getModel('Client'),
+                required: true,
+                include: [{
+                  model: App.getModel('User'),
+                  attributes: ['email', 'fullName', 'firstName']
+                }]
+              }]
+            });
+
+            if (mOrderWithDetails && mOrderWithDetails.Client && mOrderWithDetails.Client.User) {
+              const clientUser = mOrderWithDetails.Client.User;
+
+              // Validate email recipient (skip if no valid email)
+              const validation = App.BrevoMailer.validateEmailRecipient(clientUser);
+              if (!validation.isValid) {
+                console.warn(` #OrderDelayed: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                return;
+              }
+
+              await App.BrevoMailer.sendOrderNotification({
+                to: validation.email,
+                clientName: clientUser.fullName || clientUser.firstName,
+                orderId: mOrder.id,
+                type: 'delayed',
+                data: {
+                  restaurantName: mRestaurant.name,
+                  delayMinutes: delay,
+                  totalDelayMinutes: updateSupplierRes.orderDelayedFor,
+                  newDeliveryTime: expectedDeliveryTime
+                }
+              });
+              console.ok(` #OrderDelayed: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+            }
+          }
+        } catch (emailError) {
+          console.error(` #OrderDelayed: Failed to send email notification: ${emailError.message}`);
+        }
+      })();
+
       // [post-processing]
       const metadata = {
         orderId: mOrder.id,

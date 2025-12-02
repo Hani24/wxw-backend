@@ -21,6 +21,7 @@ module.exports = function(App, RPath){
       const mUser = await req.user;
       const mRestaurant = await req.restaurant;
       const statuses = App.getModel('Order').getStatuses();
+      const orderTypes = App.getModel('Order').getOrderTypes();
 
       const id = req.getCommonDataInt('id', null);
 
@@ -30,7 +31,7 @@ module.exports = function(App, RPath){
       const mOrder = await App.getModel('Order').findOne({
         where: {
           id, // 10000000001
-          status: statuses.processing, 
+          status: statuses.processing,
           isCanceledByClient: false,
           isRejectedByClient: false,
           isDeliveredByCourier: false,
@@ -38,8 +39,8 @@ module.exports = function(App, RPath){
           // isPaid: true,
         },
         attributes: [
-          'id','status', // 'totalItems',
-          // 'paymentIntentId', // pi_3KOK8vLkgFoZ4U2T1BMMb01a
+          'id','status','orderType', // 'totalItems',
+          'paymentIntentId', // pi_3KOK8vLkgFoZ4U2T1BMMb01a
           // 'clientSecret',
           'courierId',
           'clientId',
@@ -89,7 +90,22 @@ module.exports = function(App, RPath){
       if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
         return App.json( res, 404, App.t(['order','not-found','and','/','or','already','has-been','done/taken/market','as','ready'], req.lang) );
 
-      if( !mOrder.isPaid )
+      // Payment validation logic:
+      // 1. For catering and on-site-presence orders: payment is handled via payment schedules,
+      //    and restaurant acceptance implies payment arrangements are in place.
+      // 2. For regular orders:
+      //    - If isPaid is true, payment is confirmed (webhook received)
+      //    - If order status is 'processing' AND has paymentIntentId, payment was confirmed
+      //      by Stripe but webhook may not have been processed yet
+      //    - Otherwise, payment is required
+      const isCateringOrOnSitePresence =
+        mOrder.orderType === orderTypes['catering'] ||
+        mOrder.orderType === orderTypes['on-site-presence'];
+
+      const isPaymentConfirmed = mOrder.isPaid ||
+        (mOrder.status === statuses.processing && App.isString(mOrder.paymentIntentId) && mOrder.paymentIntentId.length > 0);
+
+      if( !isCateringOrOnSitePresence && !isPaymentConfirmed )
         return App.json( res, 417, App.t(['order','is-not','yet','paid'], req.lang) );
 
       if( !App.isArray(mOrder.OrderSuppliers) || !mOrder.OrderSuppliers.length )
@@ -112,6 +128,51 @@ module.exports = function(App, RPath){
       await App.json( res, true, App.t(['order','successfully','done'], res.lang) );
 
       // [post-processing]
+
+      // Send email notification to client asynchronously (don't block response)
+      (async () => {
+        try {
+          if (App.BrevoMailer && App.BrevoMailer.isEnabled) {
+            // Fetch complete order with client/user details
+            const mOrderWithDetails = await App.getModel('Order').findByPk(mOrder.id, {
+              include: [{
+                model: App.getModel('Client'),
+                required: true,
+                include: [{
+                  model: App.getModel('User'),
+                  attributes: ['email', 'fullName', 'firstName', 'isGuest']
+                }]
+              }]
+            });
+
+            if (mOrderWithDetails && mOrderWithDetails.Client && mOrderWithDetails.Client.User) {
+              const clientUser = mOrderWithDetails.Client.User;
+
+              // Validate email recipient (skip guest users and invalid emails)
+              const validation = App.BrevoMailer.validateEmailRecipient(clientUser);
+              if (!validation.isValid) {
+                console.warn(` #OrderReady: Skipping email for order #${mOrder.id} - ${validation.reason}`);
+                return;
+              }
+
+              await App.BrevoMailer.sendOrderNotification({
+                to: validation.email,
+                clientName: clientUser.fullName || clientUser.firstName,
+                orderId: mOrder.id,
+                type: 'ready',
+                data: {
+                  restaurantName: mRestaurant.name,
+                  hasDelivery: App.isPosNumber(mOrder.courierId),
+                  courierAssigned: App.isPosNumber(mOrder.courierId)
+                }
+              });
+              console.ok(` #OrderReady: Email notification sent to ${validation.email} for order #${mOrder.id}`);
+            }
+          }
+        } catch (emailError) {
+          console.error(` #OrderReady: Failed to send email notification: ${emailError.message}`);
+        }
+      })();
 
       if( App.isPosNumber(mOrder.courierId) ){
 
