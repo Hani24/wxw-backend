@@ -37,7 +37,7 @@ module.exports = class BrevoMailer {
     try {
       // Initialize Brevo API client
       this.apiInstance = new brevo.TransactionalEmailsApi();
-      this.apiInstance.authentications.apiKey.apiKey = BREVO_API_KEY;
+      this.apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
       this.isEnabled = true;
 
       console.ok(` #BrevoMailer:initialized successfully`);
