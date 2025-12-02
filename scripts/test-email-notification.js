@@ -4,14 +4,17 @@
  */
 
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
+// Load environment configuration the same way as the main application
+require(path.resolve(__dirname, '../src/envs/init.env.js'));
+
 const brevo = require('@getbrevo/brevo');
 
 async function testBrevoEmail() {
   try {
     console.log('\n🔍 Testing Brevo Email Configuration...\n');
 
-    // Check environment variables
+    // Check environment variables (now loaded from envs/dev or envs/common)
     const BREVO_API_KEY = process.env.BREVO_API_KEY;
     const BREVO_ENABLED = process.env.BREVO_ENABLED;
     const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL_EMAIL || 'noreply@example.com';
@@ -35,6 +38,13 @@ async function testBrevoEmail() {
 
     // Get recipient email from command line or use default
     const recipientEmail = process.argv[2];
+
+    if (!recipientEmail) {
+      console.error('❌ Recipient email is required');
+      console.error('   Usage: node scripts/test-email-notification.js <recipient-email>');
+      console.error('   Example: node scripts/test-email-notification.js user@example.com\n');
+      process.exit(1);
+    }
 
     console.log('🔧 Initializing Brevo API...');
     const apiInstance = new brevo.TransactionalEmailsApi();
