@@ -21,8 +21,8 @@ module.exports = class BrevoMailer {
     console.line();
     console.info(` #BrevoMailer:init`);
 
-    const BREVO_API_KEY = process.env.BREVO_API_KEY || false;
-    const BREVO_ENABLED = this.App.getBooleanFromValue(process.env.BREVO_ENABLED || 'false');
+    const BREVO_API_KEY = this.App.getEnv('BREVO_API_KEY') || false;
+    const BREVO_ENABLED = this.App.getEnvAsBool('BREVO_ENABLED');
 
     if (!BREVO_ENABLED) {
       console.warn(` #BrevoMailer: Disabled (BREVO_ENABLED=false)`);
@@ -138,8 +138,8 @@ module.exports = class BrevoMailer {
         }
 
         // Get sender configuration from environment
-        const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_EMAIL_EMAIL || 'noreply@example.com';
-        const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || process.env.SMTP_EMAIL_FROM || 'DeliveryDelight';
+        const BREVO_SENDER_EMAIL = this.App.getEnv('BREVO_SENDER_EMAIL') || this.App.getEnv('SMTP_EMAIL_EMAIL') || 'noreply@example.com';
+        const BREVO_SENDER_NAME = this.App.getEnv('BREVO_SENDER_NAME') || this.App.getEnv('SMTP_EMAIL_FROM') || 'DeliveryDelight';
 
         // Dry run mode - return without sending
         if (dryRun) {
