@@ -188,23 +188,57 @@ module.exports = function(App, RPath){
       //   card_present, customer_balance, eps, fpx, giropay, grabpay, ideal, interac_present, klarna,
       //   konbini, link, oxxo, p24, paynow, sepa_debit, sofort, us_bank_account, and wechat_pay.
 
-      // For catering and on-site-presence orders, charge only the first payment (50%)
+      // For catering and on-site-presence orders, determine payment amount based on event date
       let paymentAmount = Math.floor( mOrder.finalPrice * 100 );
       let paymentDescription = `Order: #${mOrder.id}`;
+      let chargeFullAmount = false;
+      let eventDetails = null;
 
       if(isCatering) {
         const cateringDetails = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
-        if(cateringDetails && cateringDetails.firstPaymentAmount) {
-          paymentAmount = Math.floor( cateringDetails.firstPaymentAmount * 100 );
-          paymentDescription = `Catering Order: #${mOrder.id} - First Payment (50%)`;
+        if(cateringDetails) {
+          eventDetails = cateringDetails;
+          // Check if second payment is due based on the due date (not payment status)
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const secondPaymentDueDate = new Date(cateringDetails.secondPaymentDueDate);
+          secondPaymentDueDate.setHours(0, 0, 0, 0);
+          const isSecondPaymentDue = today >= secondPaymentDueDate;
+
+          if(isSecondPaymentDue) {
+            // Charge full amount (100%) if event is < 3 days away
+            chargeFullAmount = true;
+            paymentAmount = Math.floor( mOrder.finalPrice * 100 );
+            paymentDescription = `Catering Order: #${mOrder.id} - Full Payment (100% - Event < 3 days)`;
+          } else {
+            // Charge first payment only (50%)
+            paymentAmount = Math.floor( cateringDetails.firstPaymentAmount * 100 );
+            paymentDescription = `Catering Order: #${mOrder.id} - First Payment (50%)`;
+          }
         }
       }
 
       if(isOnSitePresence) {
         const onSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
-        if(onSiteDetails && onSiteDetails.firstPaymentAmount) {
-          paymentAmount = Math.floor( onSiteDetails.firstPaymentAmount * 100 );
-          paymentDescription = `On-Site Presence Order: #${mOrder.id} - First Payment (50%)`;
+        if(onSiteDetails) {
+          eventDetails = onSiteDetails;
+          // Check if second payment is due based on the due date (not payment status)
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const secondPaymentDueDate = new Date(onSiteDetails.secondPaymentDueDate);
+          secondPaymentDueDate.setHours(0, 0, 0, 0);
+          const isSecondPaymentDue = today >= secondPaymentDueDate;
+
+          if(isSecondPaymentDue) {
+            // Charge full amount (100%) if event is < 3 days away
+            chargeFullAmount = true;
+            paymentAmount = Math.floor( mOrder.finalPrice * 100 );
+            paymentDescription = `On-Site Presence Order: #${mOrder.id} - Full Payment (100% - Event < 3 days)`;
+          } else {
+            // Charge first payment only (50%)
+            paymentAmount = Math.floor( onSiteDetails.firstPaymentAmount * 100 );
+            paymentDescription = `On-Site Presence Order: #${mOrder.id} - First Payment (50%)`;
+          }
         }
       }
 
@@ -232,8 +266,10 @@ module.exports = function(App, RPath){
           _discountType: mOrder.discountType,
           _discountCode: mOrder.discountCode,
           _discountAmount: mOrder.discountAmount,
-          // For catering and on-site-presence: indicate this is first payment
-          ...(isCatering || isOnSitePresence ? { paymentType: 'first_payment' } : {}),
+          // For catering and on-site-presence: indicate payment type
+          ...((isCatering || isOnSitePresence) ? {
+            paymentType: chargeFullAmount ? 'full_payment' : 'first_payment'
+          } : {}),
           // nested objects are not allowed by stripe
           // discount: {
           //   type: mOrder.discountType || 'n/a',
@@ -450,35 +486,61 @@ module.exports = function(App, RPath){
         const tx = await App.DB.sequelize.transaction( App.DB.getTxOptions() );
 
         try{
+          // For catering and on-site-presence orders, keep status as 'created' until restaurant accepts
+          // For regular orders, change to 'processing' immediately
+          const shouldKeepCreatedStatus = isCatering || isOnSitePresence;
+
           mOrder = await mOrder.update({
             paymentIntentId,
             clientSecret,
-            status: statuses['processing'],
+            ...(!shouldKeepCreatedStatus && { status: statuses['processing'] }),
           }, {transaction: tx});
 
           mOrder = await mOrder.update({checksum: true}, {transaction: tx});
           if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
             throw Error('Failed update mOrder record');
 
-          // For catering orders, update first payment details
+          // For catering orders, update payment details
           if(isCatering) {
             const mCateringDetails = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
             if(mCateringDetails) {
-              await mCateringDetails.update({
-                firstPaymentIntentId: paymentIntentId,
-                firstPaymentPaidAt: App.getISODate()
-              }, {transaction: tx});
+              if(chargeFullAmount) {
+                // Event is < 3 days away - mark both payments as paid
+                await mCateringDetails.update({
+                  firstPaymentIntentId: paymentIntentId,
+                  firstPaymentPaidAt: App.getISODate(),
+                  secondPaymentIntentId: paymentIntentId,  // Same payment intent for full payment
+                  secondPaymentPaidAt: App.getISODate()
+                }, {transaction: tx});
+              } else {
+                // Only first payment charged
+                await mCateringDetails.update({
+                  firstPaymentIntentId: paymentIntentId,
+                  firstPaymentPaidAt: App.getISODate()
+                }, {transaction: tx});
+              }
             }
           }
 
-          // For on-site-presence orders, update first payment details
+          // For on-site-presence orders, update payment details
           if(isOnSitePresence) {
             const mOnSiteDetails = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
             if(mOnSiteDetails) {
-              await mOnSiteDetails.update({
-                firstPaymentIntentId: paymentIntentId,
-                firstPaymentPaidAt: App.getISODate()
-              }, {transaction: tx});
+              if(chargeFullAmount) {
+                // Event is < 3 days away - mark both payments as paid
+                await mOnSiteDetails.update({
+                  firstPaymentIntentId: paymentIntentId,
+                  firstPaymentPaidAt: App.getISODate(),
+                  secondPaymentIntentId: paymentIntentId,  // Same payment intent for full payment
+                  secondPaymentPaidAt: App.getISODate()
+                }, {transaction: tx});
+              } else {
+                // Only first payment charged
+                await mOnSiteDetails.update({
+                  firstPaymentIntentId: paymentIntentId,
+                  firstPaymentPaidAt: App.getISODate()
+                }, {transaction: tx});
+              }
             }
           }
 
@@ -502,6 +564,23 @@ module.exports = function(App, RPath){
         mOrder = await mOrder.update({checksum: true});
         if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
           return await App.json( res, false, App.t(['Failed to finalize order'], req.lang) );
+
+        // Refetch payment details to show updated paidAt timestamps
+        if(isOnSitePresence) {
+          const mOnSiteDetailsUpdated = await App.getModel('OrderOnSitePresenceDetails').getByOrderId(mOrder.id);
+          if(App.isObject(mOnSiteDetailsUpdated) && orderDetails.onSitePresenceDetails) {
+            orderDetails.onSitePresenceDetails.paymentSchedule.firstPayment.paidAt = mOnSiteDetailsUpdated.firstPaymentPaidAt;
+            orderDetails.onSitePresenceDetails.paymentSchedule.secondPayment.paidAt = mOnSiteDetailsUpdated.secondPaymentPaidAt;
+          }
+        }
+
+        if(isCatering) {
+          const mCateringDetailsUpdated = await App.getModel('OrderCateringDetails').getByOrderId(mOrder.id);
+          if(App.isObject(mCateringDetailsUpdated) && orderDetails.cateringDetails) {
+            orderDetails.cateringDetails.paymentSchedule.firstPayment.paidAt = mCateringDetailsUpdated.firstPaymentPaidAt;
+            orderDetails.cateringDetails.paymentSchedule.secondPayment.paidAt = mCateringDetailsUpdated.secondPaymentPaidAt;
+          }
+        }
 
         await App.json( res, true, App.t(['Order has been confirmed and paid'], res.lang), orderDetails );
 
@@ -549,7 +628,9 @@ module.exports = function(App, RPath){
                   orderType: orderTypeText,
                   restaurantName: restaurantName,
                   totalPrice: mOrder.finalPrice.toFixed(2),
-                  eventDate: eventDate
+                  eventDate: eventDate,
+                  paymentType: chargeFullAmount ? 'full_payment' : (isCatering || isOnSitePresence ? 'first_payment' : 'full_payment'),
+                  paymentAmount: (paymentAmount / 100).toFixed(2)
                 }
               });
               console.ok(` #OrderConfirmed: Email notification sent to ${validation.email} for order #${mOrder.id}`);

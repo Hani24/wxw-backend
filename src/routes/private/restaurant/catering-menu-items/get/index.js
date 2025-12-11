@@ -52,7 +52,6 @@ module.exports = function(App, RPath){
         menuItemId: item.menuItemId,
         feedsPeople: item.feedsPeople,
         minimumQuantity: item.minimumQuantity,
-        leadTimeDays: item.leadTimeDays,
         cateringPrice: item.cateringPrice,
         isAvailableForCatering: item.isAvailableForCatering,
         menuItem: {

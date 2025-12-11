@@ -40,10 +40,12 @@ module.exports = function(App, RPath){
         include: [
           {
             model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
             required: false,
           },
           {
             model: App.getModel('OrderCateringDetails'),
+            as: 'OrderCateringDetails',
             required: false,
           },
           {
@@ -64,9 +66,9 @@ module.exports = function(App, RPath){
       const isCatering = mOrder.orderType === orderTypes['catering'];
 
       const details = isOnSitePresence
-        ? mOrder.OrderOnSitePresenceDetail
+        ? mOrder.OrderOnSitePresenceDetails
         : isCatering
-          ? mOrder.OrderCateringDetail
+          ? mOrder.OrderCateringDetails
           : null;
 
       if(!details)

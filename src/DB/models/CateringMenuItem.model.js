@@ -4,7 +4,6 @@ const { Sequelize, DataTypes, Model } = require('sequelize');
 // Links regular menu items to catering availability with additional fields:
 // - feedsPeople: How many people this item serves
 // - minimumQuantity: Minimum order quantity for catering
-// - leadTimeDays: Days of advance notice required
 
 module.exports = async( exportModelWithName, App, params, sequelize )=>{
 
@@ -33,12 +32,6 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       allowNull: false,
       defaultValue: 1,
       comment: 'Minimum quantity required for catering orders',
-    },
-    leadTimeDays: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      defaultValue: 0,
-      comment: 'Days of advance notice required for this item',
     },
     isAvailableForCatering: {
       type: DataTypes.BOOLEAN,
@@ -103,25 +96,6 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
         [MenuItem, 'order', 'ASC']
       ]
     });
-  };
-
-  /**
-   * Check if menu item meets lead time requirement
-   */
-  Model.meetsLeadTimeRequirement = function(cateringMenuItem, eventDate){
-    if(!cateringMenuItem || !cateringMenuItem.leadTimeDays){
-      return true;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const event = new Date(eventDate);
-    event.setHours(0, 0, 0, 0);
-
-    const daysUntilEvent = Math.floor((event - today) / (1000 * 60 * 60 * 24));
-
-    return daysUntilEvent >= cateringMenuItem.leadTimeDays;
   };
 
   /**

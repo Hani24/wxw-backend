@@ -122,7 +122,7 @@ class Geo {
 
   }
 
-  getDistance( from={}, to={}, convertTo='meter', convMultiplier=1.25 ){
+  getDistance( from={}, to={}, convertTo='meter', convMultiplier=1.0 ){
 
     try{
       // console.json({getDistance: {from, to}});
@@ -139,7 +139,7 @@ class Geo {
       let distance = 0;
 
       const meters = geolib
-        .getDistance( fromRes.data, toRes.data ) * ((+convMultiplier) || 1.25);
+        .getDistance( fromRes.data, toRes.data ) * ((+convMultiplier) || 1.0);
 
       let isDefault = false;
 

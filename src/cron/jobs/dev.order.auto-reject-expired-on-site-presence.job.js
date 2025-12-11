@@ -8,7 +8,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
     runAtStart: false,
     debug: config.debug,
     runAt: [
-      { each: 5, type: 'minutes' }, // Run every 5 minutes to check for expired orders
+      { each: 15, type: 'minutes' }, // Run every 15 minutes to check for expired orders
     ],
   });
 
@@ -42,6 +42,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
           {
             required: true,
             model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
             where: {
               restaurantAcceptedAt: null,
               restaurantRejectedAt: null,
@@ -90,7 +91,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
         if(job.isDebugOn())
           job.log(`   #order: [${mOrder.id}]: processing auto-rejection`);
 
-        const details = mOrder.OrderOnSitePresenceDetail;
+        const details = mOrder.OrderOnSitePresenceDetails;
         const client = mOrder.Client;
 
         // Get OrderSupplier - it should exist, but handle gracefully if not

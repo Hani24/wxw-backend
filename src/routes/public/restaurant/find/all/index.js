@@ -369,6 +369,35 @@ module.exports = function(App, RPath){
           mRestaurants.count = filteredRows.length;
         }
 
+        // Get coordinates for distance calculation (even if not doing proximity search)
+        let distanceCoords = null;
+        if (mClient && App.isPosNumber(mClient.id)) {
+          const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+            where: {
+              clientId: mClient.id,
+              isDefault: true,
+              isDeleted: false,
+            },
+          });
+
+          if (defaultAddress && defaultAddress.lat && defaultAddress.lon) {
+            distanceCoords = {
+              lat: defaultAddress.lat,
+              lon: defaultAddress.lon
+            };
+          }
+        }
+
+        // Fallback to user coordinates if no default address found
+        if (!distanceCoords && App.isObject(mUser) && mUser.lat && mUser.lon) {
+          distanceCoords = { lat: mUser.lat, lon: mUser.lon };
+        }
+
+        // Fallback to request info coordinates
+        if (!distanceCoords && res.info && res.info.lat && res.info.lon) {
+          distanceCoords = { lat: res.info.lat, lon: res.info.lon };
+        }
+
         // Initialize distance fields, format image URLs, and add order type settings
         if(App.isArray(mRestaurants.rows) && mRestaurants.rows.length) {
           for(const mRestaurant of mRestaurants.rows) {
@@ -422,16 +451,16 @@ module.exports = function(App, RPath){
                 reason: ud.reason || null,
               }));
 
-              // Initialize distance values
+              // Initialize distance values with proper defaults
               mRestaurant.dataValues.distance = 0;
-              mRestaurant.dataValues.distanceType = 'mile';
+              mRestaurant.dataValues.distanceType = mDeliveryPriceSettings.unitType || 'mile';
 
-              // Calculate distance if user coordinates are available
-              if(searchCoords && searchCoords.lat && searchCoords.lon) {
-                const distRes = App.geo.lib.getDistance(searchCoords, mRestaurant, mDeliveryPriceSettings.unitType);
+              // Calculate distance if coordinates are available
+              if(distanceCoords && distanceCoords.lat && distanceCoords.lon) {
+                const distRes = App.geo.lib.getDistance(distanceCoords, mRestaurant, mDeliveryPriceSettings.unitType || 'mile');
                 if(distRes.success) {
                   mRestaurant.dataValues.distance = distRes.data.distance;
-                  mRestaurant.dataValues.distanceType = 'mile';
+                  mRestaurant.dataValues.distanceType = distRes.data.units;
                 }
               }
 

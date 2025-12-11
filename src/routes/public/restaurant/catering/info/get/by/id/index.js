@@ -167,7 +167,6 @@ module.exports = function(App, RPath){
           regularPrice: item.MenuItem.price,
           feedsPeople: item.feedsPeople,
           minimumQuantity: item.minimumQuantity,
-          leadTimeDays: item.leadTimeDays,
           nutritionalInfo: {
             kcal: item.MenuItem.kcal,
             proteins: item.MenuItem.proteins,
@@ -183,10 +182,8 @@ module.exports = function(App, RPath){
       const menuCategories = categoryOrder.map(catName => menuByCategory[catName])
         .sort((a, b) => a.categoryOrder - b.categoryOrder);
 
-      // Calculate minimum lead time across all items
-      const minimumLeadTimeDays = cateringItems.length > 0
-        ? Math.max(...cateringItems.map(item => item.leadTimeDays || 0), 10) // Minimum 10 days for catering
-        : 10;
+      // Note: Lead time for catering orders is now managed at the restaurant level
+      // via RestaurantOrderTypeSettings.daysRequiredToPrepareCatering
 
       // Format restaurant data
       const restaurantData = {

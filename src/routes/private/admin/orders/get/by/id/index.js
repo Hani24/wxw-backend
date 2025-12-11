@@ -109,6 +109,7 @@ module.exports = function(App, RPath){
           {
             required: false,
             model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
             attributes: [
               'id', 'eventDate', 'eventStartTime', 'eventEndTime',
               'numberOfPeople', 'numberOfHours', 'specialRequests',

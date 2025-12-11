@@ -7,10 +7,10 @@ Update catering menu item details
   "cateringMenuItemId": "required: <number>",
   "feedsPeople": "optional: <number>",
   "minimumQuantity": "optional: <number>",
-  "leadTimeDays": "optional: <number>",
   "cateringPrice": "optional: <float>",
   "isAvailableForCatering": "optional: <boolean>"
 }
+Note: Lead time for catering orders is set at the restaurant level via RestaurantOrderTypeSettings.daysRequiredToPrepareCatering
 */
 
 // POST /private/restaurant/catering-menu-items/update
@@ -67,10 +67,6 @@ module.exports = function(App, RPath){
 
       if(data.minimumQuantity !== undefined){
         updateData.minimumQuantity = Math.max(1, req.getCommonDataInt('minimumQuantity', 1));
-      }
-
-      if(data.leadTimeDays !== undefined){
-        updateData.leadTimeDays = Math.max(0, req.getCommonDataInt('leadTimeDays', 0));
       }
 
       if(data.cateringPrice !== undefined){

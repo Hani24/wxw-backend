@@ -85,14 +85,13 @@ module.exports = async(exportModelWithName, App, params, sequelize) => {
       const guestToken = App.BCrypt.randomSecureToken(32);
       const expiresAt = App.DT.moment().add(24, 'hours').format(App.getDateFormat());
 
-      // Create temporary guest user with unique phone
-      const tempPhone = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create temporary guest user without phone number (will be added when they register)
       const tempPassword = App.BCrypt.randomSecureToken(16);
 
       const roles = App.getModel('User').getRoles();
 
       const mUser = await App.getModel('User').create({
-        phone: tempPhone,
+        phone: null, // Guest users don't have phone initially
         password: await App.BCrypt.hash(tempPassword),
         role: roles.client,
         isGuest: true,

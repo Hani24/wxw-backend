@@ -102,8 +102,8 @@ module.exports = function(App, RPath){
         isEmailAuth = true;
         isGoogleAuth = (provider === 'google.com');
 
-        // Generate unique placeholder for phone field (unique constraint)
-        phone = `EMAIL_${data_t.uid}`;
+        // Phone is null for email-based authentication
+        phone = null;
 
       } else {
         return await App.json(res, 417, App.t(['authentication','provider','not','supported'], req.lang));

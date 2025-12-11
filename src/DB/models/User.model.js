@@ -54,7 +54,7 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       type: DataTypes.BOOLEAN, allowNull: true, defaultValue: false,
     },
     phone: {
-      type: DataTypes.STRING, allowNull: false, unique: true,
+      type: DataTypes.STRING, allowNull: true, defaultValue: null, unique: false,
     },
     isPhoneVerified: {
       type: DataTypes.BOOLEAN, allowNull: true, defaultValue: false,

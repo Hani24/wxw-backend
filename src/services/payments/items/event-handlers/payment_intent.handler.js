@@ -29,13 +29,58 @@ module.exports = (parent, eventGroupType)=>{
 
       const PAYMENT_INTENT = mObject.id;
 
-      const mOrder = await App.getModel('Order').findOne({
+      // Check if this is a first payment or second payment
+      const paymentType = mObject.metadata.paymentType || 'full_payment';
+      const ORDER_TYPES = App.getModel('Order').getOrderTypes();
+
+      let mOrder = await App.getModel('Order').findOne({
         where: {
           paymentIntentId: PAYMENT_INTENT,
           id: mMetadata.orderId,
           clientId: mMetadata.clientId,
         },
       });
+
+      // If not found with main paymentIntentId, check split payment intents
+      if(!App.isObject(mOrder) && (paymentType === 'first_payment' || paymentType === 'second_payment')){
+        // Search in catering details
+        const cateringDetails = await App.getModel('OrderCateringDetails').findOne({
+          where: {
+            [paymentType === 'first_payment' ? 'firstPaymentIntentId' : 'secondPaymentIntentId']: PAYMENT_INTENT
+          },
+          include: [{
+            model: App.getModel('Order'),
+            as: 'Order',
+            where: {
+              id: mMetadata.orderId,
+              clientId: mMetadata.clientId,
+            }
+          }]
+        });
+
+        if(App.isObject(cateringDetails) && cateringDetails.Order){
+          mOrder = cateringDetails.Order;
+        } else {
+          // Search in on-site presence details
+          const onSiteDetails = await App.getModel('OrderOnSitePresenceDetails').findOne({
+            where: {
+              [paymentType === 'first_payment' ? 'firstPaymentIntentId' : 'secondPaymentIntentId']: PAYMENT_INTENT
+            },
+            include: [{
+              model: App.getModel('Order'),
+              as: 'Order',
+              where: {
+                id: mMetadata.orderId,
+                clientId: mMetadata.clientId,
+              }
+            }]
+          });
+
+          if(App.isObject(onSiteDetails) && onSiteDetails.Order){
+            mOrder = onSiteDetails.Order;
+          }
+        }
+      }
 
       if( !App.isObject(mOrder) || !App.isPosNumber(mOrder.id) )
         return{ success: false, message: ` #${mMetadata.id}: Payment-Intent: [${PAYMENT_INTENT}]: is not available in the orders` };

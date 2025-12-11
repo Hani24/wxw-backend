@@ -60,60 +60,60 @@ module.exports = function (App, RPath) {
       if (!App.isObject(mRestaurant) || !App.isPosNumber(mRestaurant.id))
         return App.json(res, 404, App.t(['Restaurant', 'id', 'not-found'], req.lang));
 
+      // Get delivery price settings for unit type
+      const mDeliveryPriceSettings = await App.getModel('DeliveryPriceSettings').getSettings();
+
+      // Initialize distance values with proper defaults
       mRestaurant.dataValues.distance = 0;
-      mRestaurant.dataValues.distanceType = '';
+      mRestaurant.dataValues.distanceType = mDeliveryPriceSettings.unitType || 'mile';
 
-    //  if (App.isObject(mUser) || (res.info.lat && res.info.lon)) {
-    //    const { unitType } = await App.getModel('DeliveryPriceSettings').getSettings();
-    //    const mFrom = App.isObject(mUser) ? mUser : res.info;
-    //    const distRes = App.geo.lib.getDistance(mFrom, mRestaurant, unitType || 'miles');
-    //    if (distRes.success) {
-    //      mRestaurant.dataValues.distance = distRes.data.distance;
-    //      mRestaurant.dataValues.distanceType = distRes.data.units;
-     //   }
-     // }
-	  if (App.isObject(mUser) || (res.info.lat && res.info.lon)) {
-  const mDeliveryPriceSettings = await App.getModel('DeliveryPriceSettings').getSettings();
+      // Try to get coordinates for distance calculation
+      let deliveryCoords = null;
 
-  let deliveryCoords = null;
+      // Try to get delivery coordinates from default address if client exists
+      if (App.isObject(mClient) && App.isPosNumber(mClient.id)) {
+        const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+          where: {
+            clientId: mClient.id,
+            isDefault: true,
+            isDeleted: false,
+          },
+        });
 
-  // Try to get delivery coordinates from default address if client exists
-  if (App.isObject(mClient) && App.isPosNumber(mClient.id)) {
-    const defaultAddress = await App.getModel('DeliveryAddress').findOne({
-      where: {
-        clientId: mClient.id,
-        isDefault: true,
-        isDeleted: false,
-      },
-    });
+        if (defaultAddress && defaultAddress.lat && defaultAddress.lon) {
+          deliveryCoords = {
+            lat: defaultAddress.lat,
+            lon: defaultAddress.lon,
+          };
+          console.log('[Distance] Using default delivery address:', deliveryCoords);
+        }
+      }
 
-    if (defaultAddress) {
-      deliveryCoords = {
-        lat: defaultAddress.lat,
-        lon: defaultAddress.lon,
-      };
-    }
-  }
+      // Fallback to user coordinates if no default address found
+      if (!deliveryCoords && App.isObject(mUser) && mUser.lat && mUser.lon) {
+        deliveryCoords = { lat: mUser.lat, lon: mUser.lon };
+        console.log('[Distance] Using user coordinates:', deliveryCoords);
+      }
 
-  // Fallback to user coordinates if no default address found
-  if (!deliveryCoords && App.isObject(mUser) && mUser.lat && mUser.lon) {
-    deliveryCoords = { lat: mUser.lat, lon: mUser.lon };
-  }
+      // Fallback to request info coordinates
+      if (!deliveryCoords && res.info && res.info.lat && res.info.lon) {
+        deliveryCoords = { lat: res.info.lat, lon: res.info.lon };
+        console.log('[Distance] Using request IP geolocation:', deliveryCoords);
+      }
 
-  // Fallback to request info coordinates
-  if (!deliveryCoords && res.info.lat && res.info.lon) {
-    deliveryCoords = { lat: res.info.lat, lon: res.info.lon };
-  }
+      if (!deliveryCoords) {
+        console.log('[Distance] No coordinates available - distance will be 0');
+      }
 
-  // Calculate distance if we have coordinates
-  if (deliveryCoords) {
-    const distRes = App.geo.lib.getDistance(deliveryCoords, mRestaurant, mDeliveryPriceSettings.unitType || 'miles');
-    if (distRes.success) {
-      mRestaurant.dataValues.distance = distRes.data.distance;
-      mRestaurant.dataValues.distanceType = distRes.data.units;
-    }
-  }
-}
+      // Calculate distance if we have coordinates
+      if (deliveryCoords) {
+        const distRes = App.geo.lib.getDistance(deliveryCoords, mRestaurant, mDeliveryPriceSettings.unitType || 'mile');
+        console.log('[Distance] Calculation result:', distRes);
+        if (distRes.success) {
+          mRestaurant.dataValues.distance = distRes.data.distance;
+          mRestaurant.dataValues.distanceType = distRes.data.units;
+        }
+      }
 
       mRestaurant.dataValues.State = mRestaurant.City.State;
       delete mRestaurant.City.dataValues.State;
@@ -205,7 +205,7 @@ module.exports = function (App, RPath) {
       includeMenuItem.push({
         model: App.getModel('CateringMenuItem'),
         as: 'CateringMenuItem',
-        attributes: ['id', 'feedsPeople', 'minimumQuantity', 'leadTimeDays', 'isAvailableForCatering', 'cateringPrice'],
+        attributes: ['id', 'feedsPeople', 'minimumQuantity', 'isAvailableForCatering', 'cateringPrice'],
         required: false,
       });
 
@@ -257,7 +257,6 @@ module.exports = function (App, RPath) {
                   isAvailableForCatering: mMenuItem.CateringMenuItem.isAvailableForCatering,
                   feedsPeople: mMenuItem.CateringMenuItem.feedsPeople,
                   minimumQuantity: mMenuItem.CateringMenuItem.minimumQuantity,
-                  leadTimeDays: mMenuItem.CateringMenuItem.leadTimeDays,
                   cateringPrice: mMenuItem.CateringMenuItem.cateringPrice ? parseFloat(mMenuItem.CateringMenuItem.cateringPrice) : null,
                 };
               } else {
@@ -265,7 +264,6 @@ module.exports = function (App, RPath) {
                   isAvailableForCatering: false,
                   feedsPeople: null,
                   minimumQuantity: null,
-                  leadTimeDays: null,
                   cateringPrice: null,
                 };
               }

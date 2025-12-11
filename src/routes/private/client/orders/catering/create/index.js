@@ -181,12 +181,8 @@ module.exports = function(App, RPath){
           return App.json(res, 417, App.t(['Menu item not available for catering'], req.lang));
         }
 
-        // Check lead time
-        if(!CateringMenuItem.meetsLeadTimeRequirement(cateringMenuItem, eventDate)){
-          return App.json(res, 417, App.t([
-            `${cateringMenuItem.MenuItem.name} requires ${cateringMenuItem.leadTimeDays} days advance notice`
-          ], req.lang));
-        }
+        // Note: Lead time validation is handled at the order-type level via RestaurantOrderTypeSettings.daysRequiredToPrepareCatering
+        // This check is done earlier in the flow (line ~127) and applies to the entire order
 
         // Calculate quantity needed to serve numberOfPeople
         // If item feeds 5 people and we need 12 people: quantity = Math.ceil(12/5) = 3

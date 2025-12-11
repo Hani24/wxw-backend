@@ -248,6 +248,7 @@ module.exports = function(App, RPath){
           include: [
             {
               model: App.getModel('OrderOnSitePresenceDetails'),
+              as: 'OrderOnSitePresenceDetails',
               required: false,
             }
           ]

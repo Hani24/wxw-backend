@@ -32,6 +32,7 @@ module.exports = function(App, RPath){
         include: [
           {
             model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
             required: false,
             where: {
               restaurantAcceptedAt: null,
@@ -40,6 +41,7 @@ module.exports = function(App, RPath){
           },
           {
             model: App.getModel('OrderCateringDetails'),
+            as: 'OrderCateringDetails',
             required: false,
             where: {
               restaurantAcceptedAt: null,
@@ -76,9 +78,9 @@ module.exports = function(App, RPath){
         const isCatering = order.orderType === orderTypes['catering'];
 
         const details = isOnSitePresence
-          ? order.OrderOnSitePresenceDetail
+          ? order.OrderOnSitePresenceDetails
           : isCatering
-            ? order.OrderCateringDetail
+            ? order.OrderCateringDetails
             : null;
 
         if(!details) continue;

@@ -102,6 +102,7 @@ module.exports = function(App, RPath) {
           {
             required: false, // Optional - only for on-site presence orders
             model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
             attributes: [
               'id', 'eventDate', 'eventStartTime', 'eventEndTime',
               'numberOfPeople', 'numberOfHours', 'specialRequests',
@@ -197,8 +198,8 @@ module.exports = function(App, RPath) {
 
         // Add on-site presence details if this is an on-site presence order
         const orderTypes = App.getModel('Order').getOrderTypes();
-        if (mOrder.orderType === orderTypes['on-site-presence'] && mOrder.OrderOnSitePresenceDetail) {
-          const details = mOrder.OrderOnSitePresenceDetail;
+        if (mOrder.orderType === orderTypes['on-site-presence'] && mOrder.OrderOnSitePresenceDetails) {
+          const details = mOrder.OrderOnSitePresenceDetails;
           mOrder.dataValues.onSitePresenceDetails = {
             eventDate: details.eventDate,
             eventStartTime: details.eventStartTime || null,
@@ -250,7 +251,7 @@ module.exports = function(App, RPath) {
         delete mOrder.dataValues.OrderDeliveryTime;
         delete mOrder.dataValues.OrderDeliveryAddress;
         delete mOrder.dataValues.OrderSuppliers;
-        delete mOrder.dataValues.OrderOnSitePresenceDetail;
+        delete mOrder.dataValues.OrderOnSitePresenceDetails;
         delete mOrder.dataValues.OrderCateringDetails;
       }
 

@@ -148,11 +148,8 @@ module.exports = function(App, RPath){
           continue;
         }
 
-        // Check lead time requirement
-        if(!CateringMenuItem.meetsLeadTimeRequirement(cateringMenuItem, eventDate)){
-          errors.push(`Menu item "${cateringMenuItem.MenuItem.name}" requires ${cateringMenuItem.leadTimeDays} days advance notice`);
-          continue;
-        }
+        // Note: Lead time validation is handled at the order-type level via RestaurantOrderTypeSettings.daysRequiredToPrepareCatering
+        // This applies to the entire order, not individual menu items
 
         // Calculate quantity needed to serve numberOfPeople
         // If item feeds 5 people and we need 12 people: quantity = Math.ceil(12/5) = 3
@@ -187,8 +184,7 @@ module.exports = function(App, RPath){
           pricePerItem: effectivePrice,
           subtotal: parseFloat(subtotal.toFixed(2)),
           feedsPeople: cateringMenuItem.feedsPeople,
-          minimumQuantity: cateringMenuItem.minimumQuantity,
-          leadTimeDays: cateringMenuItem.leadTimeDays
+          minimumQuantity: cateringMenuItem.minimumQuantity
         });
       }
 

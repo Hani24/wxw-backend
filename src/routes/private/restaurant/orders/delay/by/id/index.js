@@ -38,7 +38,7 @@ module.exports = function(App, RPath){
       const mOrder = await App.getModel('Order').findOne({
         where: {
           id, // 10000000001
-          status: statuses.processing, 
+          status: statuses.processing,
           isCanceledByClient: false,
           isRejectedByClient: false,
           // isPaid: true,
@@ -46,16 +46,13 @@ module.exports = function(App, RPath){
           isDeliveredByCourier: false,
         },
         attributes: [
-          'id','status', // 'totalItems',
-          // 'paymentIntentId', // pi_3KOK8vLkgFoZ4U2T1BMMb01a
-          // 'clientSecret',
+          'id','status',
           'courierId',
           'clientId',
-          'isPaid', // 'paidAt',
           'expectedDeliveryTime',
           'allSuppliersHaveConfirmedAt',
           'checksum',
-          ...App.getModel('Order').getChecksumKeys(),
+          ...App.getModel('Order').getChecksumKeys(), // includes: id, status, clientId, totalPrice, deliveryPrice, isFreeDelivery, finalPrice, totalItems, isPaid, isRefunded
         ],
         include: [
           {

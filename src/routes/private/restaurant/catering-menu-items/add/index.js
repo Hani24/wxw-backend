@@ -7,10 +7,10 @@ Add or update a menu item for catering availability
   "menuItemId": "required: <number> Ref. MenuItem.id",
   "feedsPeople": "required: <number> How many people this item feeds",
   "minimumQuantity": "optional: <number> default: 1",
-  "leadTimeDays": "optional: <number> default: 0 - Days advance notice required",
   "cateringPrice": "optional: <float> Catering-specific price (null = use regular price)",
   "isAvailableForCatering": "optional: <boolean> default: true"
 }
+Note: Lead time for catering orders is set at the restaurant level via RestaurantOrderTypeSettings.daysRequiredToPrepareCatering
 */
 
 // POST /private/restaurant/catering-menu-items/add
@@ -53,7 +53,6 @@ module.exports = function(App, RPath){
 
       // Optional fields
       const minimumQuantity = Math.max(1, req.getCommonDataInt('minimumQuantity', 1));
-      const leadTimeDays = Math.max(0, req.getCommonDataInt('leadTimeDays', 0));
       const isAvailableForCatering = App.getBoolFromValue(req.getCommonDataString('isAvailableForCatering', true));
 
       // Optional catering price
@@ -68,7 +67,6 @@ module.exports = function(App, RPath){
         menuItemId,
         feedsPeople,
         minimumQuantity,
-        leadTimeDays,
         cateringPrice,
         isAvailableForCatering,
         isDeleted: false,
