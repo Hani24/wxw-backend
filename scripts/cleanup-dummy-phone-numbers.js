@@ -7,26 +7,34 @@
  * Usage: node scripts/cleanup-dummy-phone-numbers.js
  */
 
+const mysql = require('mysql2/promise');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 (async () => {
+  let conn;
   try {
     console.log('Starting cleanup of dummy phone numbers...\n');
 
-    // Initialize the App
-    const App = await require('../src/app.boot.js')();
+    // Create database connection
+    conn = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    });
 
     // Find all users with dummy phone numbers (starting with EMAIL_ or guest_)
-    const usersWithDummyPhone = await App.DB.query(
-      `SELECT id, email, phone, firstName, lastName, isGuest FROM Users WHERE phone LIKE 'EMAIL_%' OR phone LIKE 'guest_%'`,
-      { type: App.DB.QueryTypes.SELECT }
+    const [usersWithDummyPhone] = await conn.execute(
+      `SELECT id, email, phone, firstName, lastName, isGuest FROM Users WHERE phone LIKE 'EMAIL_%' OR phone LIKE 'guest_%'`
     );
 
     console.log(`Found ${usersWithDummyPhone.length} users with dummy phone numbers.\n`);
 
     if (usersWithDummyPhone.length === 0) {
       console.log('No cleanup needed. Exiting...');
+      await conn.end();
       process.exit(0);
     }
 
@@ -48,17 +56,19 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
     console.log('Updating...\n');
 
     // Update all users with dummy phone numbers
-    const [updateCount] = await App.DB.query(
+    const [result] = await conn.execute(
       `UPDATE Users SET phone = NULL WHERE phone LIKE 'EMAIL_%' OR phone LIKE 'guest_%'`
     );
 
-    console.log(`✅ Successfully updated ${updateCount} users.`);
+    console.log(`✅ Successfully updated ${result.affectedRows} users.`);
     console.log('Dummy phone numbers have been removed.\n');
 
+    await conn.end();
     process.exit(0);
 
   } catch (error) {
     console.error('Error during cleanup:', error);
+    if (conn) await conn.end();
     process.exit(1);
   }
 })();

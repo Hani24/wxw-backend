@@ -3,7 +3,7 @@ module.exports = async ( App, params, BaseJob, jobName='n/a', config={} )=>{
   const Job = new BaseJob( App, {
     name: jobName,
     allowMultipleTasksAtTheSameTime: false, // Prevent concurrent executions
-    isEnabled: true, // Enable this job
+    isEnabled: false, // Enable this job
     runOnce: false,
     runAtStart: false,
     debug: config.debug,
