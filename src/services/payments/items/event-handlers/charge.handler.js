@@ -79,6 +79,7 @@ module.exports = (parent, eventGroupType)=>{
         return {success: false, message: `Order: ${mOrder.id} Security check error`};
 
       const statuses = App.getModel('Order').getStatuses();
+      const orderTypes = App.getModel('Order').getOrderTypes();
 
       // captured, succeeded, failed, refunded, expired, pending, updated
       switch(mEvent.event){
@@ -92,9 +93,9 @@ module.exports = (parent, eventGroupType)=>{
 
           if(
             (mObject.amount !== mMetadata.finalPrice)
-            || 
+            ||
             (mObject.amount !== mObject.amount_captured)
-            // || 
+            // ||
             // (mObject.amount_refunded > 0)
             // e.g.
             //   "amount": 2341,
@@ -111,8 +112,16 @@ module.exports = (parent, eventGroupType)=>{
             return {success: false, message: ` #${mOrder.id}: incorrect payment data`};
           }
 
+          // For catering and on-site-presence orders, keep status as 'created' until restaurant accepts
+          // For regular orders, change to 'processing' immediately
+          const isCatering = mOrder.orderType === orderTypes['catering'];
+          const isOnSitePresence = mOrder.orderType === orderTypes['on-site-presence'];
+          const shouldKeepCreatedStatus = isCatering || isOnSitePresence;
+
           const updateOrderOnCapturedRes = await mOrder.update({
-            status: statuses.processing, // new rule (13-jun-2022) try execute auto-payment if (payment-method == Card) && set as [processing]
+            // Only change to 'processing' for regular orders
+            // Catering and on-site-presence orders stay in 'created' until restaurant accepts
+            ...(!shouldKeepCreatedStatus && { status: statuses.processing }),
             isPaid: true,
             paidAt: App.getISODate(),
 

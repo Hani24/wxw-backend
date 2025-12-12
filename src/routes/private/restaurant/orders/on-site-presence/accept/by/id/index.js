@@ -93,10 +93,27 @@ module.exports = function(App, RPath){
           restaurantAcceptedAt: now,
         }, { transaction });
 
-        // Update order status to processing
+        // Update order status to processing and mark all suppliers confirmed
+        // For catering/on-site-presence orders, there's only one supplier (the restaurant)
+        // so when they accept, all suppliers have confirmed
         await mOrder.update({
           status: statuses['processing'],
+          allSuppliersHaveConfirmed: true,
         }, { transaction });
+
+        // Update OrderSupplier to mark as accepted by restaurant
+        await App.getModel('OrderSupplier').update(
+          {
+            isAcceptedByRestaurant: true,
+          },
+          {
+            where: {
+              orderId: mOrder.id,
+              restaurantId: mRestaurant.id,
+            },
+            transaction,
+          }
+        );
 
         await transaction.commit();
 

@@ -25,6 +25,7 @@ module.exports = function(App, RPath){
 
       const delays = App.getModel('OrderSupplier').getDelays({asArray: true});
       const statuses = App.getModel('Order').getStatuses();
+      const orderTypes = App.getModel('Order').getOrderTypes();
 
       const id = req.getCommonDataInt('id', null);
       const delay = req.getCommonDataInt('delay', null);
@@ -44,6 +45,8 @@ module.exports = function(App, RPath){
           // isPaid: true,
           // isRefunded: false,
           isDeliveredByCourier: false,
+          // Only allow delays for order-now type (not catering or on-site-presence)
+          orderType: orderTypes['order-now'],
         },
         attributes: [
           'id','status',
@@ -108,6 +111,10 @@ module.exports = function(App, RPath){
 
       if( !App.isObject(mSupplier) || !App.isPosNumber(mSupplier.id) )
         return App.json( res, 404, App.t(['Order supplier not found and/or cannotbe delayed'], req.lang) );
+
+      // Ensure expectedDeliveryTime exists (safety check)
+      if( !mOrder.expectedDeliveryTime )
+        return App.json( res, 417, App.t(['Order does not have an expected delivery time'], req.lang) );
 
       const updateSupplierRes = await mSupplier.update({
         orderDelayedFor: mSupplier.orderDelayedFor + delay,
@@ -179,6 +186,14 @@ module.exports = function(App, RPath){
       })();
 
       // [post-processing]
+      // Helper function to safely format date with timezone fallback to UTC
+      const formatWithTimezone = (date, timezone) => {
+        const validTimezone = timezone && timezone !== 'n/a' && App.DT.moment.tz.zone(timezone)
+          ? timezone
+          : 'UTC';
+        return App.DT.moment(date).tz(validTimezone).format(App.getDateFormat());
+      };
+
       const metadata = {
         orderId: mOrder.id,
         userId: mOrder.Client.User.id,
@@ -207,11 +222,11 @@ module.exports = function(App, RPath){
               message: `${mRestaurant.name}: ${ App.t(['has delay of', delay, 'min.']) }`,
               data: {
                 ...metadata,
-                ...( App.isObject(mOrder.Courier) && App.isObject(mOrder.Courier.User) 
+                ...( App.isObject(mOrder.Courier) && App.isObject(mOrder.Courier.User)
                   ? {
-                    expectedDeliveryTime: App.DT.moment(updateOrder.expectedDeliveryTime).tz( mOrder.Courier.User.timezone ).format( App.getDateFormat() ),
-                    allSuppliersHaveConfirmedAt: App.DT.moment(updateOrder.allSuppliersHaveConfirmedAt).tz( mOrder.Courier.User.timezone ).format( App.getDateFormat() ),
-                  } 
+                    expectedDeliveryTime: formatWithTimezone(updateOrder.expectedDeliveryTime, mOrder.Courier.User.timezone),
+                    allSuppliersHaveConfirmedAt: formatWithTimezone(updateOrder.allSuppliersHaveConfirmedAt, mOrder.Courier.User.timezone),
+                  }
                   : {
                     expectedDeliveryTime: mOrder.expectedDeliveryTime,
                     allSuppliersHaveConfirmedAt: mOrder.allSuppliersHaveConfirmedAt,
@@ -239,8 +254,8 @@ module.exports = function(App, RPath){
           allSuppliersHaveConfirmedAt: updateOrder.allSuppliersHaveConfirmedAt,
         },
         tz: {
-          expectedDeliveryTime: App.DT.moment(updateOrder.expectedDeliveryTime).tz( mOrder.Client.User.timezone ).format( App.getDateFormat() ),
-          allSuppliersHaveConfirmedAt: App.DT.moment(updateOrder.allSuppliersHaveConfirmedAt).tz( mOrder.Client.User.timezone ).format( App.getDateFormat() ),          
+          expectedDeliveryTime: formatWithTimezone(updateOrder.expectedDeliveryTime, mOrder.Client.User.timezone),
+          allSuppliersHaveConfirmedAt: formatWithTimezone(updateOrder.allSuppliersHaveConfirmedAt, mOrder.Client.User.timezone),
         }
       });
 
@@ -251,8 +266,8 @@ module.exports = function(App, RPath){
           message: `${mRestaurant.name}: ${ App.t(['has delay of', delay, 'min.']) }`,
           data: {
             ...metadata,
-            expectedDeliveryTime: App.DT.moment(updateOrder.expectedDeliveryTime).tz( mOrder.Client.User.timezone ).format( App.getDateFormat() ),
-            allSuppliersHaveConfirmedAt: App.DT.moment(updateOrder.allSuppliersHaveConfirmedAt).tz( mOrder.Client.User.timezone ).format( App.getDateFormat() ),
+            expectedDeliveryTime: formatWithTimezone(updateOrder.expectedDeliveryTime, mOrder.Client.User.timezone),
+            allSuppliersHaveConfirmedAt: formatWithTimezone(updateOrder.allSuppliersHaveConfirmedAt, mOrder.Client.User.timezone),
           },
         });
 
