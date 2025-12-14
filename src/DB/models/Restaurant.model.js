@@ -296,6 +296,8 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
             'id', 'eventDate', 'eventStartTime', 'eventEndTime',
             'numberOfPeople', 'numberOfHours', 'specialRequests',
             'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+            'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+            'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
             'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
             'acceptanceDeadline',
           ],
@@ -314,6 +316,23 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
             'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
             'acceptanceDeadline',
           ],
+        },
+        {
+          required: false, // Optional - only for order-now orders
+          model: App.getModel('OrderDeliveryAddress'),
+          attributes: ['id'],
+          include: [{
+            model: App.getModel('DeliveryAddress'),
+            attributes: [
+              'id','label','city','stateId','street','apartment','description','lat','lon'
+            ],
+            include: [{
+              model: App.getModel('State'),
+              attributes: [
+                'id','name','code'
+              ],
+            }]
+          }]
         },
         {
           required: true,
@@ -366,6 +385,32 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     };
 
     const mOrders = await App.getModel('Order').findAndCountAll( params );
+
+    // Attach default delivery address to each client
+    if (mOrders && mOrders.rows && Array.isArray(mOrders.rows)) {
+      for (const order of mOrders.rows) {
+        if (order.Client && order.Client.id) {
+          const defaultAddress = await App.getModel('DeliveryAddress').findOne({
+            where: {
+              clientId: order.Client.id,
+              isDefault: true,
+              isDeleted: false,
+            },
+            attributes: [
+              'id','label','city','stateId','street','apartment','description','lat','lon'
+            ],
+            include: [{
+              model: App.getModel('State'),
+              attributes: ['id','name','code'],
+            }]
+          });
+
+          // Attach as address property (not array, just the default address)
+          order.Client.dataValues.address = defaultAddress || null;
+        }
+      }
+    }
+
     return mOrders;
 
   }
@@ -392,7 +437,13 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
     'isClientActionExecuted', 'clientActionExecutedAt',
     'createdAt',
     <Client>: {
-      'id','lat','lon'
+      'id','lat','lon',
+      'address': { // Optional - client's default delivery address
+        'id','label','city','stateId','street','apartment','description','lat','lon',
+        <State>: {
+          'id','name','code'
+        }
+      },
       <User>: {
         'id','phone','gender','image','firstName','lastName',
       }
@@ -401,6 +452,8 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       'id', 'eventDate', 'eventStartTime', 'eventEndTime',
       'numberOfPeople', 'numberOfHours', 'specialRequests',
       'estimatedBasePrice', 'estimatedServiceFee', 'estimatedTotalPrice',
+      'firstPaymentAmount', 'firstPaymentDueDate', 'firstPaymentPaidAt',
+      'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
       'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
       'acceptanceDeadline',
     },
@@ -413,6 +466,15 @@ module.exports = async( exportModelWithName, App, params, sequelize )=>{
       'secondPaymentAmount', 'secondPaymentDueDate', 'secondPaymentPaidAt',
       'restaurantAcceptedAt', 'restaurantRejectedAt', 'rejectionReason',
       'acceptanceDeadline',
+    },
+    <OrderDeliveryAddress>: { // Optional - only present for order-now orders
+      'id',
+      <DeliveryAddress>: {
+        'id','label','city','stateId','street','apartment','description','lat','lon',
+        <State>: {
+          'id','name','code'
+        }
+      }
     },
     <OrderSupplier>: {
       'id','restaurantId','totalPrice','totalItems',
