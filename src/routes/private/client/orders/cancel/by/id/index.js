@@ -34,25 +34,20 @@ module.exports = function(App, RPath){
       const mOrder = await App.getModel('Order').findOne({
         where: {
           id, // 10000000001
-          clientId: mClient.id,          
+          clientId: mClient.id,
         },
         attributes: [
-          'id',
+          'id','status','orderType',
+          'clientId','courierId',
+          'totalPrice','deliveryPrice','isFreeDelivery','finalPrice','totalItems',
+          'isPaid','isRefunded',
           'allSuppliersHaveConfirmed',
-          'paymentIntentId', // pi_3KOK8vLkgFoZ4U2T1BMMb01a
-          'clientSecret',
-          'status', // 'totalItems',
-          'courierId',
-          'clientId',
-          'isDeliveredByCourier', // 'deliveredByCourierAt',
-          'isCourierRatedByClient', // 'courierRatedByClientAt','courierRating',
-          'isRejectedByClient', // 'rejectedByClientAt','rejectionReason',
-          'isCanceledByClient', // 'canceledByClientAt','cancellationReason',
-          'isPaid',
-          'isRefunded',
-          'finalPrice',
+          'paymentIntentId','clientSecret',
+          'isDeliveredByCourier',
+          'isCourierRatedByClient',
+          'isRejectedByClient',
+          'isCanceledByClient',
           'isValidChecksum','checksum',
-          ...App.getModel('Order').getChecksumKeys(),
         ],
         include: [
           {
@@ -68,6 +63,28 @@ module.exports = function(App, RPath){
               'isOrderDelayed','orderDelayedFor',
               'isValidChecksum','checksum',
               ...App.getModel('OrderSupplier').getChecksumKeys(),
+            ],
+          },
+          {
+            model: App.getModel('OrderCateringDetails'),
+            as: 'OrderCateringDetails',
+            required: false,
+            attributes: [
+              'id','orderId',
+              'firstPaymentIntentId','firstPaymentPaidAt','firstPaymentAmount',
+              'secondPaymentIntentId','secondPaymentPaidAt','secondPaymentAmount',
+              'eventDate',
+            ],
+          },
+          {
+            model: App.getModel('OrderOnSitePresenceDetails'),
+            as: 'OrderOnSitePresenceDetails',
+            required: false,
+            attributes: [
+              'id','orderId',
+              'firstPaymentIntentId','firstPaymentPaidAt','firstPaymentAmount',
+              'secondPaymentIntentId','secondPaymentPaidAt','secondPaymentAmount',
+              'eventDate',
             ],
           }
         ]
@@ -194,19 +211,83 @@ module.exports = function(App, RPath){
         courierId: COURIER_ID,
       };
 
-      // request refunded anyway ...
-      if( App.isString(PAYMENT_INTENT_ID) /*&& mOrder.isPaid && !mOrder.isRefunded*/ ){
-        console.debug(`#${mOrder.id}: PAYMENT_INTENT_ID: ${PAYMENT_INTENT_ID}, CLIENT_SECRET: ${CLIENT_SECRET} `);
-        const paymentIntentRefundRes = await App.payments.stripe.paymentIntentRefund( PAYMENT_INTENT_ID, {
-          // reason: cancellationReason,
-          metadata,
-        });
-        console.debug(`paymentIntentRefundRes: ${paymentIntentRefundRes.message}`);
-      }
+      // Handle payment refunds based on order type
+      const ORDER_TYPES = App.getModel('Order').getOrderTypes();
+      const isCatering = mOrder.orderType === ORDER_TYPES['catering'];
+      const isOnSitePresence = mOrder.orderType === ORDER_TYPES['on-site-presence'];
 
-      if( App.isString(PAYMENT_INTENT_ID) /*&& mOrder.isPaid && !mOrder.isRefunded*/ ){
-        const paymentIntentCancelRes = await App.payments.stripe.paymentIntentCancel( PAYMENT_INTENT_ID, {});
-        console.debug(`paymentIntentCancelRes: ${paymentIntentCancelRes.message}`);
+      if( isCatering || isOnSitePresence ){
+        // Handle split payment refunds for catering/on-site-presence orders
+        const details = isCatering ? mOrder.OrderCateringDetails : mOrder.OrderOnSitePresenceDetails;
+        const orderTypeName = isCatering ? 'Catering' : 'On-Site-Presence';
+
+        if( App.isObject(details) ){
+          console.debug(`#${mOrder.id}: ${orderTypeName} order - processing split payment refunds`);
+
+          // Refund first payment if it was paid
+          if( App.isString(details.firstPaymentIntentId) && details.firstPaymentPaidAt ){
+            console.debug(`#${mOrder.id}: Refunding first payment: ${details.firstPaymentIntentId} (${details.firstPaymentAmount})`);
+            const firstRefundRes = await App.payments.stripe.paymentIntentRefund( details.firstPaymentIntentId, {
+              metadata: {
+                ...metadata,
+                paymentType: 'first_payment',
+                paymentAmount: details.firstPaymentAmount,
+              },
+            });
+            console.debug(`#${mOrder.id}: First payment refund: ${firstRefundRes.message}`);
+          } else {
+            console.debug(`#${mOrder.id}: First payment not paid yet, skipping refund`);
+          }
+
+          // Refund second payment if it was paid
+          if( App.isString(details.secondPaymentIntentId) && details.secondPaymentPaidAt ){
+            console.debug(`#${mOrder.id}: Refunding second payment: ${details.secondPaymentIntentId} (${details.secondPaymentAmount})`);
+            const secondRefundRes = await App.payments.stripe.paymentIntentRefund( details.secondPaymentIntentId, {
+              metadata: {
+                ...metadata,
+                paymentType: 'second_payment',
+                paymentAmount: details.secondPaymentAmount,
+              },
+            });
+            console.debug(`#${mOrder.id}: Second payment refund: ${secondRefundRes.message}`);
+          } else {
+            console.debug(`#${mOrder.id}: Second payment not paid yet, skipping refund`);
+          }
+
+          // Cancel first payment intent if it exists but hasn't been paid yet
+          if( App.isString(details.firstPaymentIntentId) && !details.firstPaymentPaidAt ){
+            console.debug(`#${mOrder.id}: Canceling unpaid first payment intent: ${details.firstPaymentIntentId}`);
+            const firstCancelRes = await App.payments.stripe.paymentIntentCancel( details.firstPaymentIntentId, {});
+            console.debug(`#${mOrder.id}: First payment cancel: ${firstCancelRes.message}`);
+          }
+
+          // Cancel second payment intent if it exists but hasn't been paid yet
+          if( App.isString(details.secondPaymentIntentId) && !details.secondPaymentPaidAt ){
+            console.debug(`#${mOrder.id}: Canceling unpaid second payment intent: ${details.secondPaymentIntentId}`);
+            const secondCancelRes = await App.payments.stripe.paymentIntentCancel( details.secondPaymentIntentId, {});
+            console.debug(`#${mOrder.id}: Second payment cancel: ${secondCancelRes.message}`);
+          }
+        } else {
+          console.error(`#${mOrder.id}: ${orderTypeName} order but no details found - cannot process refunds`);
+        }
+      } else {
+        // Handle regular order refunds (existing logic for 'order-now')
+        console.debug(`#${mOrder.id}: Regular order - processing standard payment refund`);
+
+        // request refunded anyway ...
+        if( App.isString(PAYMENT_INTENT_ID) /*&& mOrder.isPaid && !mOrder.isRefunded*/ ){
+          console.debug(`#${mOrder.id}: PAYMENT_INTENT_ID: ${PAYMENT_INTENT_ID}, CLIENT_SECRET: ${CLIENT_SECRET} `);
+          const paymentIntentRefundRes = await App.payments.stripe.paymentIntentRefund( PAYMENT_INTENT_ID, {
+            // reason: cancellationReason,
+            metadata,
+          });
+          console.debug(`paymentIntentRefundRes: ${paymentIntentRefundRes.message}`);
+        }
+
+        if( App.isString(PAYMENT_INTENT_ID) /*&& mOrder.isPaid && !mOrder.isRefunded*/ ){
+          const paymentIntentCancelRes = await App.payments.stripe.paymentIntentCancel( PAYMENT_INTENT_ID, {});
+          console.debug(`paymentIntentCancelRes: ${paymentIntentCancelRes.message}`);
+        }
       }
 
       if( App.isObject(mCourier) && App.isPosNumber(mCourier.id) ){

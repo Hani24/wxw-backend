@@ -26,7 +26,7 @@ module.exports = function(App, RPath) {
           }
         },
         distinct: true,
-        attributes: ['id', 'status', 'createdAt'],
+        attributes: ['id', 'status', 'orderType', 'createdAt'],
         include: [
           {
             model: App.getModel('Courier'),

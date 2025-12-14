@@ -99,6 +99,7 @@ module.exports = function(App, RPath){
         await mOrder.update({
           status: statuses['processing'],
           allSuppliersHaveConfirmed: true,
+          checksum: true, // Recalculate checksum after status change
         }, { transaction });
 
         // Update OrderSupplier to mark as accepted by restaurant
