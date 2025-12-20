@@ -14,16 +14,25 @@ module.exports = (parent, eventGroupType)=>{
         clientId: ( + mObject.metadata.clientId) || null,
         totalItems: ( + mObject.metadata.totalItems) || null,
         totalPrice: ( + mObject.metadata.totalPrice) || null,
-        deliveryPrice: ( + mObject.metadata.deliveryPrice) || null,
+        // For catering and on-site-presence orders, deliveryPrice can be 0
+        deliveryPrice: mObject.metadata.deliveryPrice !== undefined ? ( + mObject.metadata.deliveryPrice) : null,
         finalPrice: Math.floor( (( + mObject.metadata.finalPrice) || 0) *100 ), // cents
       };
 
       // console.json({mMetadata});
 
       for( const mKey of Object.keys(mMetadata) ){
-        if( App.isNull(mMetadata[ mKey ]) ){
-          console.error(`{mMetadata}: mKey: ${mKey} => has not valid data`);
-          return {success: false, message: ['one-of-the','required','keys','is-missing']};
+        // Allow deliveryPrice to be 0 for catering and on-site-presence orders
+        if( mKey === 'deliveryPrice' ){
+          if( mMetadata[ mKey ] === null || mMetadata[ mKey ] === undefined ){
+            console.error(`{mMetadata}: mKey: ${mKey} => has not valid data`);
+            return {success: false, message: ['one-of-the','required','keys','is-missing']};
+          }
+        } else {
+          if( App.isNull(mMetadata[ mKey ]) ){
+            console.error(`{mMetadata}: mKey: ${mKey} => has not valid data`);
+            return {success: false, message: ['one-of-the','required','keys','is-missing']};
+          }
         }
       }
 
