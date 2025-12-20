@@ -8,6 +8,10 @@ module.exports = (parent, eventGroupType)=>{
 
       const mObject = mEvent.object;
 
+      // Log what Stripe is sending for debugging
+      console.log(` #payment_intent.handler: Received metadata from Stripe:`, JSON.stringify(mObject.metadata));
+      console.log(` #payment_intent.handler: deliveryPrice raw value:`, mObject.metadata.deliveryPrice, `(type: ${typeof mObject.metadata.deliveryPrice})`);
+
       const mMetadata = {
         orderId: ( + mObject.metadata.orderId) || null,
         userId: ( + mObject.metadata.userId) || null,

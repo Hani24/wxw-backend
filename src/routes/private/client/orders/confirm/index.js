@@ -259,7 +259,7 @@ module.exports = function(App, RPath){
           totalItems: mOrder.totalItems,
           totalPrice: mOrder.totalPrice,
           totalPriceFee: mOrder.totalPriceFee,
-          deliveryPrice: mOrder.deliveryPrice,
+          deliveryPrice: String(mOrder.deliveryPrice), // Convert to string to ensure 0 is preserved in Stripe metadata
           deliveryPriceFee: mOrder.deliveryPriceFee,
           isFreeDelivery: mOrder.isFreeDelivery,
           finalPrice: mOrder.finalPrice,

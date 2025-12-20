@@ -9,6 +9,10 @@ module.exports = (parent, eventGroupType)=>{
       // console.json({mEvent});
       const mObject = mEvent.object;
 
+      // Log what Stripe is sending for debugging
+      console.log(` #charge.handler: Received metadata from Stripe:`, JSON.stringify(mObject.metadata));
+      console.log(` #charge.handler: deliveryPrice raw value:`, mObject.metadata.deliveryPrice, `(type: ${typeof mObject.metadata.deliveryPrice})`);
+
       const mMetadata = {
         orderId: ( + mObject.metadata.orderId) || null,
         userId: ( + mObject.metadata.userId) || null,
